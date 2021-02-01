@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SCC-Detection": {
+      "commandName": "Project",
+      "commandLineArgs": "test test test"
+    }
+  }
+}

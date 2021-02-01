@@ -5,20 +5,20 @@ using System.Text;
 
 namespace SCC_Detection.Datastructures
 {
-    class Graph
+    public class Graph
     {
         private Dictionary<int, List<int>> map;
         private Dictionary<int, List<int>> transposedMap;
 
-        private int nodeCount = 0;
-        private Dictionary<int, int> idMap = new Dictionary<int, int>();
-        private List<int> reverseIdMap = new List<int>();
+        //private int nodeCount = 0;
+        //private Dictionary<int, int> idMap = new Dictionary<int, int>();
+        //private List<int> reverseIdMap = new List<int>();
 
         public Graph(Dictionary<int, List<int>> map)
         {
             Graph.CheckMap(map);
             this.map = this.InitializeMap(map);
-            transposedMap = Graph.Transpose(this.map);
+            this.transposedMap = Graph.Transpose(this.map);
         }
 
         public Graph(Graph g, bool transposed = false)
@@ -42,15 +42,25 @@ namespace SCC_Detection.Datastructures
         /// <param name="totalSet">(Sub)set of the graph we want to include in the reachability search</param>
         /// <param name="map">Mapping from vertex to its neighbours</param>
         /// <returns>HashSet of the reachable vertices</returns>
-        private static HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
+        public static HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
             Queue<int> edge = new Queue<int>(fromSet);
 
             HashSet<int> reachable = new HashSet<int>(fromSet);
 
+            // Use the convention that a vertex can reach itself always,
+            // Because that makes sense when defining a single vertex as a trivial SCC.
+            
             while (edge.Count > 0)
             {
                 int current = edge.Dequeue();
+
+                if (totalSet.Contains(current) && !reachable.Contains(current))
+                {
+                    reachable.Add(current);
+                    edge.Enqueue(current);
+                }
+
                 List<int> neighbours = map[current];
 
                 foreach(int neighbour in neighbours)
@@ -58,7 +68,6 @@ namespace SCC_Detection.Datastructures
                     // Look at the totalSet because we also use this for subgraphs
                     if (totalSet.Contains(neighbour) && !reachable.Contains(neighbour))
                     {
-                        reachable.Add(neighbour);
                         edge.Enqueue(neighbour);
                     }
                 }
@@ -79,7 +88,7 @@ namespace SCC_Detection.Datastructures
 
             foreach(int key in keys)
             {
-                result[key] = null;
+                result[key] = new List<int>();
             }
 
             // For each id in the graph
@@ -92,11 +101,6 @@ namespace SCC_Detection.Datastructures
                     // Look at its neighbours
                     foreach(int neighbour in neighbours)
                     {
-                        if (!result.ContainsKey(neighbour))
-                        {
-                            result[neighbour] = new List<int>();
-                        }
-
                         // In the transposed graph, the neighbours can go to it,
                         // instead of it going to the neighbours
                         result[neighbour].Add(id);
@@ -167,13 +171,13 @@ namespace SCC_Detection.Datastructures
 
             foreach (KeyValuePair<int, List<int>> entry in map)
             {
-                List<int> values = GetIdMap(entry.Value);
-                result[entry.Key] = values;
+                result[entry.Key] = entry.Value;
             }
 
             return result;
         }
 
+        /*
         /// <summary>
         /// Apparently there is a mapping from id to id? from something to id? From id to something?
         /// </summary>
@@ -213,6 +217,7 @@ namespace SCC_Detection.Datastructures
 
             return result;
         }
+        */
 
         /// <summary>
         /// Returns the number of vertices + edges of the graph within the subset
