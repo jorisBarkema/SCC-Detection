@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace SCC_Detection.Datastructures
@@ -7,7 +8,7 @@ namespace SCC_Detection.Datastructures
     class Graph
     {
         private Dictionary<int, List<int>> map;
-        private Dictionary<int, List<int>> transposeMap;
+        private Dictionary<int, List<int>> transposedMap;
 
         private int nodeCount = 0;
         private Dictionary<int, int> idMap = new Dictionary<int, int>();
@@ -17,7 +18,7 @@ namespace SCC_Detection.Datastructures
         {
             Graph.CheckMap(map);
             this.map = this.InitializeMap(map);
-            transposeMap = Graph.Transpose(this.map);
+            transposedMap = Graph.Transpose(this.map);
         }
 
         public Graph(Graph g, bool transposed = false)
@@ -25,85 +26,351 @@ namespace SCC_Detection.Datastructures
             if (transposed)
             {
                 this.map = g.GetTransposedMap();
-                this.transposeMap = g.GetMap();
+                this.transposedMap = g.GetMap();
             }
             else
             {
                 this.map = g.GetMap();
-                this.transposeMap = g.GetTransposedMap();
+                this.transposedMap = g.GetTransposedMap();
             }
         }
 
+        /// <summary>
+        /// Use standard BFS to find the reachable vertices.
+        /// </summary>
+        /// <param name="fromSet">Set from which we start</param>
+        /// <param name="totalSet">(Sub)set of the graph we want to include in the reachability search</param>
+        /// <param name="map">Mapping from vertex to its neighbours</param>
+        /// <returns>HashSet of the reachable vertices</returns>
         private static HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
-            throw new NotImplementedException();
+            Queue<int> edge = new Queue<int>(fromSet);
+
+            HashSet<int> reachable = new HashSet<int>(fromSet);
+
+            while (edge.Count > 0)
+            {
+                int current = edge.Dequeue();
+                List<int> neighbours = map[current];
+
+                foreach(int neighbour in neighbours)
+                {
+                    // Look at the totalSet because we also use this for subgraphs
+                    if (totalSet.Contains(neighbour) && !reachable.Contains(neighbour))
+                    {
+                        reachable.Add(neighbour);
+                        edge.Enqueue(neighbour);
+                    }
+                }
+            }
+
+            return reachable;
         }
 
+        /// <summary>
+        /// Transpose the graph: reverse each connection.
+        /// </summary>
+        /// <param name="map">Gaph to be transposed</param>
+        /// <returns>The transposed graph.</returns>
         private static Dictionary<int, List<int>> Transpose(Dictionary<int, List<int>> map)
         {
-            throw new NotImplementedException();
+            Dictionary<int, List<int>> result = new Dictionary<int, List<int>>();
+            HashSet<int> keys = new HashSet<int>(map.Keys);
+
+            foreach(int key in keys)
+            {
+                result[key] = null;
+            }
+
+            // For each id in the graph
+            foreach(int id in keys)
+            {
+                List<int> neighbours = map[id];
+
+                if (neighbours != null)
+                {
+                    // Look at its neighbours
+                    foreach(int neighbour in neighbours)
+                    {
+                        if (!result.ContainsKey(neighbour))
+                        {
+                            result[neighbour] = new List<int>();
+                        }
+
+                        // In the transposed graph, the neighbours can go to it,
+                        // instead of it going to the neighbours
+                        result[neighbour].Add(id);
+                    }
+                }
+            }
+
+            return result;
         }
 
+        /// <summary>
+        /// Check if the map contains non-existing IDs.
+        /// </summary>
+        /// <param name="map">Graph map</param>
         private static void CheckMap(Dictionary<int, List<int>> map)
         {
-            throw new NotImplementedException();
+            HashSet<int> vertices = new HashSet<int>(map.Keys);
+
+            foreach(int vertex in vertices)
+            {
+                List<int> neighbours = map[vertex];
+
+                if (neighbours != null)
+                {
+                    foreach(int neighbour in neighbours)
+                    {
+                        if (!map.ContainsKey(neighbour))
+                        {
+                            throw new Exception($"Graph map includes non-existing ID {neighbour}.");
+                        }
+                    }
+                }
+            }
         }
 
+        /// <summary>
+        /// Fisher-Yates shuffle
+        /// https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="list"></param>
+        /// <returns>Shuffled list</returns>
+        private List<T> Shuffled<T>(List<T> list)
+        {
+            Random rng = new Random();
+
+            int n = list.Count;
+            while (n > 1)
+            {
+                n--;
+                int k = rng.Next(n + 1);
+                T value = list[k];
+                list[k] = list[n];
+                list[n] = value;
+            }
+
+            return list;
+        }
+
+        /// <summary>
+        /// I don't know what this function is supposed to accomplish actually
+        /// </summary>
+        /// <param name="map">The graph to be initialized</param>
+        /// <returns>The initialized graph</returns>
         private Dictionary<int, List<int>> InitializeMap(Dictionary<int, List<int>> map)
         {
-            throw new NotImplementedException();
+            Dictionary<int, List<int>> result = new Dictionary<int, List<int>>();
+
+            foreach (KeyValuePair<int, List<int>> entry in map)
+            {
+                List<int> values = GetIdMap(entry.Value);
+                result[entry.Key] = values;
+            }
+
+            return result;
         }
 
+        /// <summary>
+        /// Apparently there is a mapping from id to id? from something to id? From id to something?
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         private int GetIdMap(int id)
         {
-            throw new NotImplementedException();
+            if (idMap.ContainsKey(id))
+            {
+                return idMap[id];
+            }
+
+            int v = nodeCount++;
+            idMap[id] = v;
+            reverseIdMap.Add(id);
+            return v;
         }
 
+        /// <summary>
+        /// Convenience function to call GetIdMap for multiple IDs at a time.
+        /// </summary>
+        /// <param name="ids"></param>
+        /// <returns>The result of the GetIdMap calls in a list</returns>
         private List<int> GetIdMap(List<int> ids)
         {
-            throw new NotImplementedException();
+            if (ids == null)
+            {
+                return null;
+            }
+
+            List<int> result = new List<int>();
+
+            foreach (int id in ids)
+            {
+                result.Add(GetIdMap(id));
+            }
+
+            return result;
         }
 
+        /// <summary>
+        /// Returns the number of vertices + edges of the graph within the subset
+        /// </summary>
+        /// <param name="set"></param>
+        /// <returns></returns>
         private int MPlusN(HashSet<int> set)
         {
-            throw new NotImplementedException();
+            int result = 0;
+
+            foreach (int key in set)
+            {
+                List<int> neighbours = map[key];
+                if (neighbours != null)
+                {
+                    List<int> filtered = neighbours.FindAll(x => set.Contains(x));
+                    result += filtered.Count;
+                    /*
+                    foreach (int neighbour in neighbours)
+                    {
+                        if (set.Contains(neighbour))
+                        {
+                            result++;
+                        }
+                    }
+                    */
+                }
+
+                //result++;
+            }
+
+            result += set.Count;
+
+            return result;
         }
 
-        public Dictionary<int, List<int>> GetMap()
+        /// <summary>
+        /// Makes a deep copy of the graph, or transposed graph
+        /// </summary>
+        /// /// <param name="transposed">Optional boolean variable to indicate if the transposed map is required</param>
+        /// <returns>Deep copy of the (transposed) graph</returns>
+        public Dictionary<int, List<int>> GetMap(bool transposed = false)
         {
-            throw new NotImplementedException();
+            Dictionary<int, List<int>> mapToCopy = transposed ? transposedMap : map;
+            Dictionary<int, List<int>> result = new Dictionary<int, List<int>>();
+
+            foreach (KeyValuePair<int, List<int>> entry in mapToCopy)
+            {
+                result[entry.Key] = new List<int>();
+
+                foreach(int v in entry.Value)
+                {
+                    result[entry.Key].Add(v);
+                }
+            }
+
+            return result;
         }
         
+        /// <summary>
+        /// Convenience function to get the transposed graph.
+        /// </summary>
+        /// <returns>Deep copy of the transposed graph.</returns>
         public Dictionary<int, List<int>> GetTransposedMap()
         {
-            throw new NotImplementedException();
+            return GetMap(true);
         }
 
+        /// <summary>
+        /// Get all the vertices from the graph
+        /// </summary>
+        /// <returns></returns>
         public HashSet<int> Vertices()
         {
-            throw new NotImplementedException();
+            return new HashSet<int>(map.Keys);
         }
 
         public HashSet<int> Forward(HashSet<int> fromSet, HashSet<int> totalSet)
         {
-            throw new NotImplementedException();
+            return Reachable(fromSet, totalSet, map);
         }
 
         public HashSet<int> Backward(HashSet<int> fromSet, HashSet<int> totalSet)
         {
-            throw new NotImplementedException();
+            return Reachable(fromSet, totalSet, transposedMap);
         }
 
+        /// <summary>
+        /// Find the pivot set for the next step of Schudy's algorithm
+        /// See "Finding strongly connectedcomponents in parallel using O (log2 n) reachability queries"
+        /// </summary>
+        /// <param name="totalSet"></param>
+        /// <returns></returns>
         public HashSet<int> PivotSetSchudy(HashSet<int> totalSet)
         {
-            throw new NotImplementedException();
+            if (totalSet.Count == 0)
+            {
+                return new HashSet<int>();
+            }
+
+            int goal = MPlusN(totalSet) / 2;
+
+            int start = 0;
+            int end = totalSet.Count;
+
+            List<int> list = totalSet.ToList();
+
+            // Just to be sure, do a quick Fisher-Yates shuffle.
+            // Might not even be necessary because a HashSet is already a bit random.
+            list = Shuffled(list);
+
+            while ((end - start) > 1)
+            {
+                int position = (end - start) / 2 + start;
+
+                HashSet<int> fromSet = new HashSet<int>();
+
+                for (int i = 0; i < position; i++)
+                {
+                    fromSet.Add(list[i]);
+                }
+
+                HashSet<int> setF = Reachable(fromSet, totalSet, map);
+                if (MPlusN(setF) >= goal)
+                {
+                    end = position;
+                }
+                else
+                {
+                    start = position;
+                }
+            }
+
+            HashSet<int> result = new HashSet<int>();
+
+            for (int i = 0; i < end; i++)
+            {
+                result.Add(list[i]);
+            }
+
+            return result;
         }
 
+        /// <summary>
+        /// Implement this if 'improvement 2' is necessary
+        /// </summary>
+        /// <param name="totalSet"></param>
+        /// <returns></returns>
         public HashSet<int> PivotSetSchudyOnlyVertices(HashSet<int> totalSet)
         {
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// Implement this if 'improvement 3' is necessary
+        /// </summary>
+        /// <param name="totalSet"></param>
+        /// <returns></returns>
         public HashSet<int> SubSetSchudy(HashSet<int> totalSet)
         {
             throw new NotImplementedException();
@@ -111,32 +378,86 @@ namespace SCC_Detection.Datastructures
 
         public HashSet<int> HalfSetForward(HashSet<int> totalSet)
         {
-            throw new NotImplementedException();
+            if (totalSet.Count == 0)
+            {
+                return new HashSet<int>();
+            }
+            int position = totalSet.Count;
+            int goal = position / 2;
+
+            List<int> list = totalSet.ToList();
+            list = Shuffled(list);
+
+            HashSet<int> resultSet = totalSet;
+            while (position > 1 && resultSet.Count > goal)
+            {
+                position = position / 2;
+
+                HashSet<int> fromSet = new HashSet<int>();
+
+                for (int i = 0; i < position; i++)
+                {
+                    fromSet.Add(list[i]);
+                }
+
+                resultSet = Reachable(fromSet, resultSet, map);
+            }
+            return resultSet;
         }
 
         public int InDegree(int id)
         {
-            throw new NotImplementedException();
+            if (!transposedMap.ContainsKey(id)) return 0;
+
+            return transposedMap[id].Count;
         }
 
         public int OutDegree(int id)
         {
-            throw new NotImplementedException();
+            if (!map.ContainsKey(id)) return 0;
+
+            return map[id].Count;
         }
 
         public List<int> ImmediateSuccessors(int id)
         {
-            throw new NotImplementedException();
+            if (!map.ContainsKey(id)) return null;
+
+            return map[id];
         }
 
         public List<int> ImmediatePredecessors(int id)
         {
-            throw new NotImplementedException();
+            if (!transposedMap.ContainsKey(id)) return null;
+
+            return transposedMap[id];
         }
 
+        /// <summary>
+        /// Checks whether a found SCC is a Terminal SCC.
+        /// This assumes that the set is an SCC (that all vertices can reach each other),
+        /// and only checks that they cannot reach anything outside the set.
+        /// </summary>
+        /// <param name="set">The SCC</param>
+        /// <returns>If the SCC is terminal</returns>
         public bool IsTSCC(HashSet<int> set)
         {
-            throw new NotImplementedException();
+            foreach (int id in set)
+            {
+                List<int> neighbours = map[id];
+
+                if (neighbours != null)
+                {
+                    foreach (int neighbour in neighbours)
+                    {
+                        if (!set.Contains(neighbour))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
         }
 
         public HashSet<int> ForwardSeeds(HashSet<int> fromSet, HashSet<int> range)
@@ -144,14 +465,40 @@ namespace SCC_Detection.Datastructures
             throw new NotImplementedException();
         }
 
-        public bool IsLeaf(int key)
+        /// <summary>
+        /// Checks if the given vertex has any neighbours
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        public bool IsLeaf(int id)
         {
-            throw new NotImplementedException();
+            List<int> neighbours = map[id];
+            return neighbours == null || neighbours.Count == 0;
         }
 
         public override string ToString()
         {
-            throw new NotImplementedException();
+            String result = "";
+            HashSet<int> vertices = new HashSet<int>(map.Keys);
+
+            foreach(int vertex in vertices)
+            {
+                result += vertex + " --> ";
+
+                List<int> neighbours = map[vertex];
+
+                if (neighbours != null)
+                {
+                    foreach (int neighbour in neighbours)
+                    {
+                        result += " " + neighbour;
+                    }
+                }
+
+                result += "\n";
+            }
+
+            return result;
         }
     }
 }

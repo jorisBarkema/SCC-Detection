@@ -80,7 +80,6 @@ namespace SCC_Detection.Datastructures
 
             foreach (KeyValuePair<int, int> entry in components)
             {
-                // do something with entry.Value or entry.Key
                 result += "size " + entry.Key + ": " + entry.Value;
                 result += "\n";
             }
