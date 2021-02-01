@@ -254,6 +254,13 @@ namespace SCC_Detection.Datastructures
             return result;
         }
 
+        public int RandomId()
+        {
+            List<int> keys = map.Keys.ToList();
+            Random r = new Random();
+
+            return keys[r.Next(keys.Count)];
+        }
         /// <summary>
         /// Makes a deep copy of the graph, or transposed graph
         /// </summary>

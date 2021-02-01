@@ -4,12 +4,12 @@ using System.Text;
 
 namespace SCC_Detection.Datastructures
 {
-    class ResultSet
+    public class ResultSet
     {
         private List<HashSet<int>> list;
         //private ReentrantLock lock;
 
-    public ResultSet()
+        public ResultSet()
         {
             list = new List<HashSet<int>>();
             //lock = new ReentrantLock();
