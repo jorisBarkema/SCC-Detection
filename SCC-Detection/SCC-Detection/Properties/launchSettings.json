@@ -2,7 +2,7 @@
   "profiles": {
     "SCC-Detection": {
       "commandName": "Project",
-      "commandLineArgs": "4 DCSC random 1000 0.0001"
+      "commandLineArgs": "4 DCSC random 100 0.01"
     }
   }
 }

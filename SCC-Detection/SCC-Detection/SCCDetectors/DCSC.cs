@@ -15,9 +15,6 @@ namespace SCC_Detection.SCCDetectors
         Queue<HashSet<int>> taskList;
 
         bool[] status;
-        //uint status;
-        //uint done;
-
         Graph g;
 
         public DCSC(int threads)
@@ -26,11 +23,6 @@ namespace SCC_Detection.SCCDetectors
             this.status = new bool[threads];
 
             this.result = new ResultSet();
-            // Now we can compare status and done to see if all threads are done
-            // without using an array. Limits the program to max. 31 threads
-            //this.done = (uint) (1 << threads) - 1;
-            //Console.WriteLine($"done = {this.done}");
-            //this.status = 0;
 
             this.taskList = new Queue<HashSet<int>>();
         }
@@ -58,15 +50,8 @@ namespace SCC_Detection.SCCDetectors
 
         private void ThreadTask(int id)
         {
-            Console.WriteLine($"Starting thread {id}");
-
-            //while (status != done)
             while (!this.Done())
             {
-                // Set thread status to 0 if it is 1.
-                // Cannot do XOR because that goes wrong in the beginning.
-                //status &= (uint)~(1 << id);
-                //Console.WriteLine($"status = {status}");
                 while (true)
                 {
                     HashSet<int> subgraph;
@@ -79,13 +64,10 @@ namespace SCC_Detection.SCCDetectors
 
                     this.status[id] = false;
                     
-                    Console.WriteLine($"Processing subgraph with count {subgraph.Count}");
                     ProcessSubgraph(subgraph);
                 }
 
                 this.status[id] = true;
-                //status |= (uint)(1 << id);
-                //Console.WriteLine($"status = {status}");
             }
         }
 
@@ -105,9 +87,7 @@ namespace SCC_Detection.SCCDetectors
 
             // ResultSet has the locks so no need here
             this.result.Add(SCC);
-
-            Console.WriteLine("Found SCC");
-
+            
             // Calculate the remainder set
             subgraph.ExceptWith(forward);
             subgraph.ExceptWith(backward);
@@ -117,7 +97,6 @@ namespace SCC_Detection.SCCDetectors
 
             lock(this.taskList)
             {
-                Console.WriteLine("Adding three tasks to the tasklist");
                 this.taskList.Enqueue(subgraph);
                 this.taskList.Enqueue(forward);
                 this.taskList.Enqueue(backward);
@@ -129,6 +108,18 @@ namespace SCC_Detection.SCCDetectors
         private bool Done()
         {
             return !this.status.Contains(false);
+        }
+
+        private void PrintHashSet(HashSet<int> set)
+        {
+            string s = "";
+
+            foreach (int i in set)
+            {
+                s += i + " ";
+            }
+
+            Console.WriteLine(s);
         }
     }
 }
