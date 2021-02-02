@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace SCC_Detection.SCCDetectors
 {
-    class DCSC : SCCDetector
+    public class DCSC : SCCDetector
     {
         ResultSet result;
         int threads;

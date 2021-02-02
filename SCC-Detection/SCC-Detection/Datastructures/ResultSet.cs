@@ -6,12 +6,13 @@ namespace SCC_Detection.Datastructures
 {
     public class ResultSet
     {
-        private List<HashSet<int>> list;
+        public List<HashSet<int>> List { get; private set; }
+
         //private ReentrantLock lock;
 
         public ResultSet()
         {
-            list = new List<HashSet<int>>();
+            List = new List<HashSet<int>>();
             //lock = new ReentrantLock();
         }
 
@@ -22,7 +23,7 @@ namespace SCC_Detection.Datastructures
             // and lock that instead of this
             lock (this)
             {
-                list.Add(set);
+                List.Add(set);
             }
         }
 
@@ -36,7 +37,7 @@ namespace SCC_Detection.Datastructures
         public int Count()
         {
             lock(this) {
-                return list.Count;
+                return List.Count;
             }
         }
 
@@ -44,7 +45,7 @@ namespace SCC_Detection.Datastructures
         {
             lock(this)
             {
-                foreach(HashSet<int> set in list)
+                foreach(HashSet<int> set in List)
                 {
                     if (set.Contains(id))
                     {
@@ -56,13 +57,28 @@ namespace SCC_Detection.Datastructures
             return false;
         }
 
+        public HashSet<int> SCCById(int id)
+        {
+            lock (this)
+            {
+                foreach (HashSet<int> set in List)
+                {
+                    if (set.Contains(id))
+                    {
+                        return set;
+                    }
+                }
+            }
+
+            return new HashSet<int>();
+        }
 
         public override string ToString()
         {
 
             String result = "";
             Dictionary<int, int> components = new Dictionary<int, int>(); //size of component - number of such components
-            foreach (HashSet<int> set in list)
+            foreach (HashSet<int> set in List)
             {
                 int size = set.Count;
 

@@ -463,6 +463,32 @@ namespace SCC_Detection.Datastructures
             return transposedMap[id];
         }
 
+
+        /// <summary>
+        /// Utiliy function to test whether a subset is an SCC.
+        /// Does not test if it is a maximum SCC.
+        /// Really inefficient but doesn't really matter 
+        /// since it is not to be used in the actual algorithms, 
+        /// only for testing if the output is correct,
+        /// </summary>
+        /// <param name="set">The set to be tested</param>
+        /// <returns></returns>
+        public bool IsSCC(HashSet<int> set)
+        {
+            foreach(int start in set)
+            {
+                HashSet<int> reachable = Forward(start, set);
+
+                foreach(int id in set)
+                {
+                    if (id == start) continue;
+
+                    if (!reachable.Contains(id)) return false;
+                }
+            }
+
+            return true;
+        }
         /// <summary>
         /// Checks whether a found SCC is a Terminal SCC.
         /// This assumes that the set is an SCC (that all vertices can reach each other),
