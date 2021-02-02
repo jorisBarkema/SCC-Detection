@@ -254,6 +254,14 @@ namespace SCC_Detection.Datastructures
             return result;
         }
 
+        public int PivotFromSet(HashSet<int> totalSet)
+        {
+            List<int> ids = totalSet.ToList();
+            Random r = new Random();
+
+            return ids[r.Next(ids.Count)];
+        }
+
         public int RandomId()
         {
             List<int> keys = map.Keys.ToList();
@@ -300,6 +308,16 @@ namespace SCC_Detection.Datastructures
         public HashSet<int> Vertices()
         {
             return new HashSet<int>(map.Keys);
+        }
+
+        public HashSet<int> Forward(int from, HashSet<int> totalSet)
+        {
+            return Forward(new HashSet<int> { from }, totalSet);
+        }
+
+        public HashSet<int> Backward(int from, HashSet<int> totalSet)
+        {
+            return Backward(new HashSet<int> { from }, totalSet);
         }
 
         public HashSet<int> Forward(HashSet<int> fromSet, HashSet<int> totalSet)
