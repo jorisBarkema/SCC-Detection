@@ -2,6 +2,7 @@
 
 using SCC_Detection.Datastructures;
 using SCC_Detection.Input;
+using SCC_Detection.SCCDetectors;
 
 namespace SCC_Detection
 {
@@ -13,19 +14,23 @@ namespace SCC_Detection
 
             int threads = int.Parse(args[0]);
             string algorithms = args[1];
-            // TODO: Create list/array of classes which can calculate the TSCC/SCCs to pass along to the tests
 
+            SCCDetector[] detectors = ToSCCDetectors(algorithms, threads);
+
+            Graph g;
             string input = args[2];
 
-            switch(input)
+            Console.WriteLine($"Testing {algorithms} on {threads} thread(s) with graph:");
+
+            switch (input)
             {
                 case "file":
                     if (args.Length == 5)
                     {
-                        FileGraphTest(args[3], args[4]);
+                        g = CreateFileGraph(args[3], args[4], detectors);
                     } else if (args.Length == 4)
                     {
-                        FileGraphTest(args[3], "LIST");
+                        g = CreateFileGraph(args[3], "LIST", detectors);
                     } else
                     {
                         throw new Exception("Invalid arguments given for file input");
@@ -34,7 +39,7 @@ namespace SCC_Detection
                 case "random":
                     if (args.Length == 5)
                     {
-                        RandomGraphTest(int.Parse(args[3]), long.Parse(args[4]));
+                        g = CreateRandomGraph(int.Parse(args[3]), double.Parse(args[4]), detectors);
                     }
                     else
                     {
@@ -42,28 +47,52 @@ namespace SCC_Detection
                     }
                     break;
                 case "tree":
-                    TreeGraphTest();
+                    g = CreateTreeGraph();
                     break;
                 default:
-                    throw new Exception("No fitting input method passed");
+                    throw new Exception("Invalid input method passed");
+            }
+
+            //TODO: timing for the analysis
+
+            Console.WriteLine(g.ToString());
+
+            foreach (SCCDetector detector in detectors)
+            {
+                ResultSet r = detector.Compute(g);
+                Console.WriteLine(r);
             }
 
             Console.ReadLine();
         }
 
-        private static void FileGraphTest(string filename, string filetype)
+        private static Graph CreateFileGraph(string filename, string filetype, SCCDetector[] detectors)
         {
-            Graph g = filetype == "SNAP" ? GraphParser.ReadFileSNAP(filename) : GraphParser.ReadFile(filename);
+            return filetype == "SNAP" ? GraphParser.ReadFileSNAP(filename) : GraphParser.ReadFile(filename);
         }
 
-        private static void RandomGraphTest(int n, long p)
+        private static Graph CreateRandomGraph(int n, double p, SCCDetector[] detectors)
         {
-            Graph g = RandomGraph.Generate(n, p);
+            return RandomGraph.Generate(n, p);
         }
 
-        private static void TreeGraphTest()
+        private static Graph CreateTreeGraph()
         {
             // Save this one for last if needed
+            return null;
+        }
+
+        private static SCCDetector[] ToSCCDetectors(string argument, int threads)
+        {
+            switch(argument)
+            {
+                case "DCSC":
+                    return new SCCDetector[1] { new DCSC(threads) };
+                case "all":
+                    return new SCCDetector[1] { new DCSC(threads) };
+                default:
+                    throw new Exception("Invalid algorithms input passed");
+            }
         }
     }
 }

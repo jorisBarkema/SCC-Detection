@@ -1,6 +1,7 @@
 ﻿using SCC_Detection.Datastructures;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,19 +14,23 @@ namespace SCC_Detection.SCCDetectors
         int threads;
         Queue<HashSet<int>> taskList;
 
-        uint status;
-        uint done;
+        bool[] status;
+        //uint status;
+        //uint done;
 
         Graph g;
 
         public DCSC(int threads)
         {
             this.threads = threads;
+            this.status = new bool[threads];
 
+            this.result = new ResultSet();
             // Now we can compare status and done to see if all threads are done
             // without using an array. Limits the program to max. 31 threads
-            this.done = (uint) (1 << threads) - 1;
-            this.status = 0;
+            //this.done = (uint) (1 << threads) - 1;
+            //Console.WriteLine($"done = {this.done}");
+            //this.status = 0;
 
             this.taskList = new Queue<HashSet<int>>();
         }
@@ -34,13 +39,15 @@ namespace SCC_Detection.SCCDetectors
         {
             this.g = g;
 
+            taskList.Enqueue(g.Vertices());
+
             Task[] tasks = new Task[threads];
 
-            for(uint i = 0; i < threads; i++)
+            for(int i = 0; i < threads; i++)
             {
                 // Make a copy to capture the variable
                 // https://stackoverflow.com/questions/271440/captured-variable-in-a-loop-in-c-sharp
-                uint copy = i;
+                int copy = i;
                 tasks[i] = Task.Factory.StartNew(() => ThreadTask(copy));
             }
 
@@ -49,27 +56,36 @@ namespace SCC_Detection.SCCDetectors
             return this.result;
         }
 
-        private void ThreadTask(uint id)
+        private void ThreadTask(int id)
         {
-            while (status != done)
+            Console.WriteLine($"Starting thread {id}");
+
+            //while (status != done)
+            while (!this.Done())
             {
                 // Set thread status to 0 if it is 1.
                 // Cannot do XOR because that goes wrong in the beginning.
-                status &= ~id;
-
-                while (taskList.Count > 0)
+                //status &= (uint)~(1 << id);
+                //Console.WriteLine($"status = {status}");
+                while (true)
                 {
-                    HashSet<int> subgraph = new HashSet<int>();
+                    HashSet<int> subgraph;
 
                     lock (taskList)
                     {
+                        if (taskList.Count == 0) break;
                         subgraph = taskList.Dequeue();
                     }
 
+                    this.status[id] = false;
+                    
+                    Console.WriteLine($"Processing subgraph with count {subgraph.Count}");
                     ProcessSubgraph(subgraph);
                 }
 
-                status |= id;
+                this.status[id] = true;
+                //status |= (uint)(1 << id);
+                //Console.WriteLine($"status = {status}");
             }
         }
 
@@ -90,6 +106,8 @@ namespace SCC_Detection.SCCDetectors
             // ResultSet has the locks so no need here
             this.result.Add(SCC);
 
+            Console.WriteLine("Found SCC");
+
             // Calculate the remainder set
             subgraph.ExceptWith(forward);
             subgraph.ExceptWith(backward);
@@ -99,12 +117,18 @@ namespace SCC_Detection.SCCDetectors
 
             lock(this.taskList)
             {
+                Console.WriteLine("Adding three tasks to the tasklist");
                 this.taskList.Enqueue(subgraph);
                 this.taskList.Enqueue(forward);
                 this.taskList.Enqueue(backward);
             }
 
             return;
+        }
+
+        private bool Done()
+        {
+            return !this.status.Contains(false);
         }
     }
 }
