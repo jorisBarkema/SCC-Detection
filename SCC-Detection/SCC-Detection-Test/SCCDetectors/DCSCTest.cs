@@ -118,19 +118,20 @@ namespace SCC_Detection_Test
         {
             Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 10; i++)
             {
                 testMap[i] = new List<int>();
             }
 
             Graph g = new Graph(testMap);
 
+            // BUG when using more threads, see github issue
             DCSC dcsc = new DCSC(1);
             ResultSet results = dcsc.Compute(g);
 
-            Assert.IsTrue(results.List.Count == 100);
+            Assert.IsTrue(results.List.Count == 10);
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 10; i++)
             {
                 Assert.IsTrue(results.Contains(i));
             }

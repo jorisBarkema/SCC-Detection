@@ -1,5 +1,6 @@
 ﻿using SCC_Detection.Datastructures;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,9 +11,12 @@ namespace SCC_Detection.SCCDetectors
 {
     public class DCSC : SCCDetector
     {
+        CancellationTokenSource source = new CancellationTokenSource();
+        readonly object pulseLock = new object();
+
         ResultSet result;
         int threads;
-        Queue<HashSet<int>> taskList;
+        ConcurrentQueue<HashSet<int>> taskList;
 
         bool[] status;
         Graph g;
@@ -24,7 +28,7 @@ namespace SCC_Detection.SCCDetectors
 
             this.result = new ResultSet();
 
-            this.taskList = new Queue<HashSet<int>>();
+            this.taskList = new ConcurrentQueue<HashSet<int>>();
         }
 
         public override ResultSet Compute(Graph g)
@@ -35,40 +39,69 @@ namespace SCC_Detection.SCCDetectors
 
             Task[] tasks = new Task[threads];
 
-            for(int i = 0; i < threads; i++)
+            CancellationToken token = source.Token;
+
+            for (int i = 0; i < threads; i++)
             {
                 // Make a copy to capture the variable
                 // https://stackoverflow.com/questions/271440/captured-variable-in-a-loop-in-c-sharp
                 int copy = i;
-                tasks[i] = Task.Factory.StartNew(() => ThreadTask(copy));
+                tasks[i] = Task.Factory.StartNew(() => ThreadTask(copy), token);
             }
 
-            Task.WaitAll(tasks);
+            Task.WaitAny(tasks);
+
 
             return this.result;
         }
 
         private void ThreadTask(int id)
         {
-            while (!this.Done())
+            HashSet<int> subgraph;
+            
+            while(true)
             {
-                while (true)
+                this.status[id] = false;
+
+                while (taskList.TryDequeue(out subgraph))
                 {
-                    HashSet<int> subgraph;
-
-                    lock (taskList)
-                    {
-                        if (taskList.Count == 0) break;
-                        subgraph = taskList.Dequeue();
-                    }
-
-                    this.status[id] = false;
-                    
                     ProcessSubgraph(subgraph);
                 }
 
                 this.status[id] = true;
+
+                if (this.Done())
+                {
+                    return;
+                }
+
+                lock (pulseLock)
+                {
+                    Monitor.Wait(pulseLock);
+                }
             }
+            
+            /*
+            while (true)
+            {
+                while (taskList.Count == 0)
+                {
+                    this.status[id] = true;
+
+                    if (this.Done()) {
+                        Monitor.Pulse(taskList);
+                        return;
+                    }
+
+                    Monitor.Wait(taskList);
+                }
+
+                this.status[id] = false;
+                subgraph = taskList.TryDequeue();
+                
+                ProcessSubgraph(subgraph);
+            }
+            */
         }
 
         private void ProcessSubgraph(HashSet<int> subgraph)
@@ -94,14 +127,16 @@ namespace SCC_Detection.SCCDetectors
 
             forward.ExceptWith(SCC);
             backward.ExceptWith(SCC);
+            
+            this.taskList.Enqueue(subgraph);
+            this.taskList.Enqueue(forward);
+            this.taskList.Enqueue(backward);
 
-            lock(this.taskList)
+            lock(pulseLock)
             {
-                this.taskList.Enqueue(subgraph);
-                this.taskList.Enqueue(forward);
-                this.taskList.Enqueue(backward);
+                Monitor.PulseAll(pulseLock);
             }
-
+            
             return;
         }
 
