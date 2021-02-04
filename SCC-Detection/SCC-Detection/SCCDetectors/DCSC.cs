@@ -48,7 +48,6 @@ namespace SCC_Detection.SCCDetectors
                 // Make a copy to capture the variable
                 // https://stackoverflow.com/questions/271440/captured-variable-in-a-loop-in-c-sharp
                 int copy = i;
-                //tasks[i] = Task.Factory.StartNew(() => ThreadTask(copy), token);
                 //threads[copy] = new Thread(() => ThreadTask(copy));
                 threads[copy] = new Thread(new ThreadStart(() => ThreadTask(copy)));
                 threads[copy].Start();

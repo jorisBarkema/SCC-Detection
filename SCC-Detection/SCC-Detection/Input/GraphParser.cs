@@ -8,7 +8,7 @@ using SCC_Detection.Datastructures;
 
 namespace SCC_Detection.Input
 {
-    class GraphParser
+    public class GraphParser
     {
         public static Graph ReadFile(string filename)
         {

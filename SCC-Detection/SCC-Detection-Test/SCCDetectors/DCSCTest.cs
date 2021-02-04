@@ -156,5 +156,24 @@ namespace SCC_Detection_Test
                 Assert.IsTrue(g.IsSCC(results.List[i]));
             }
         }
+
+        [TestMethod]
+        public void concurrencySampleGraphTest()
+        {
+            //int size = 300;
+
+            /*
+            Graph g = GraphParser.ReadFileSNAP(@"D:\Documents\computing_science\master thesis\graphs\Wiki-Vote.txt");
+
+            // BUG when using more threads, see github issue
+            DCSC dcsc = new DCSC(10);
+            ResultSet results = dcsc.Compute(g);
+
+            for (int i = 0; i < results.List.Count; i++)
+            {
+                Assert.IsTrue(g.IsSCC(results.List[i]));
+            }
+            */
+        }
     }
 }
