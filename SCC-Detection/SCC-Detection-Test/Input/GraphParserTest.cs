@@ -17,13 +17,24 @@ namespace SCC_Detection_Test
 
             Assert.AreEqual(6, g.Vertices().Count);
             string s = g.ToString();
-            Assert.AreEqual("0 -->  1 2\n1 --> 2\n2 --> \n3 -->  4 5\n4 -->  5\n5 -->  0\n", s);
+            Assert.AreEqual("0 -->  1 2\n1 -->  2\n2 --> \n3 -->  4 5\n4 -->  5\n5 -->  0\n", s);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(FormatException))]
+        public void InvalidSnapTest()
+        {
+            Graph g = GraphParser.ReadFileSNAP(@"D:\Documents\computing_science\master thesis\graphs\InvalidSNAPTest.txt");
         }
 
         [TestMethod]
         public void ReadListTest()
         {
+            Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master thesis\graphs\ListTest.txt");
 
+            Assert.AreEqual(6, g.Vertices().Count);
+            string s = g.ToString();
+            Assert.AreEqual("0 -->  1 2\n1 -->  2\n2 --> \n3 -->  4 5\n4 -->  5\n5 -->  0\n", s);
         }
     }
 }
