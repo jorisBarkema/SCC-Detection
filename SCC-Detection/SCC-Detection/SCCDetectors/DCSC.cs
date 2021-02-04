@@ -11,20 +11,20 @@ namespace SCC_Detection.SCCDetectors
 {
     public class DCSC : SCCDetector
     {
-        CancellationTokenSource source = new CancellationTokenSource();
+        //CancellationTokenSource source = new CancellationTokenSource();
         readonly object pulseLock = new object();
 
         ResultSet result;
-        int threads;
+        int threadcount;
         ConcurrentQueue<HashSet<int>> taskList;
 
         bool[] status;
         Graph g;
 
-        public DCSC(int threads)
+        public DCSC(int threadcount)
         {
-            this.threads = threads;
-            this.status = new bool[threads];
+            this.threadcount = threadcount;
+            this.status = new bool[threadcount];
 
             this.result = new ResultSet();
 
@@ -37,20 +37,29 @@ namespace SCC_Detection.SCCDetectors
 
             taskList.Enqueue(g.Vertices());
 
-            Task[] tasks = new Task[threads];
+            Task[] tasks = new Task[threadcount];
 
-            CancellationToken token = source.Token;
+            Thread[] threads = new Thread[threadcount];
 
-            for (int i = 0; i < threads; i++)
+            //CancellationToken token = source.Token;
+
+            for (int i = 0; i < threadcount; i++)
             {
                 // Make a copy to capture the variable
                 // https://stackoverflow.com/questions/271440/captured-variable-in-a-loop-in-c-sharp
                 int copy = i;
-                tasks[i] = Task.Factory.StartNew(() => ThreadTask(copy), token);
+                //tasks[i] = Task.Factory.StartNew(() => ThreadTask(copy), token);
+                //threads[copy] = new Thread(() => ThreadTask(copy));
+                threads[copy] = new Thread(new ThreadStart(() => ThreadTask(copy)));
+                threads[copy].Start();
             }
 
-            Task.WaitAny(tasks);
+            //Task.WaitAny(tasks);
 
+            for (int i = 0; i < threadcount; i++)
+            {
+                threads[i].Join();
+            }
 
             return this.result;
         }
@@ -72,6 +81,10 @@ namespace SCC_Detection.SCCDetectors
 
                 if (this.Done())
                 {
+                    lock (pulseLock)
+                    {
+                        Monitor.PulseAll(pulseLock);
+                    }
                     return;
                 }
 

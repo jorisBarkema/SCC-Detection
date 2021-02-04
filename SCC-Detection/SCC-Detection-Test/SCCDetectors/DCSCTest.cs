@@ -6,6 +6,7 @@ using System.Text;
 
 using SCC_Detection.Datastructures;
 using SCC_Detection.SCCDetectors;
+using SCC_Detection.Input;
 using System.Linq;
 
 namespace SCC_Detection_Test
@@ -118,7 +119,9 @@ namespace SCC_Detection_Test
         {
             Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
 
-            for (int i = 0; i < 10; i++)
+            int size = 10000;
+
+            for (int i = 0; i < size; i++)
             {
                 testMap[i] = new List<int>();
             }
@@ -129,11 +132,28 @@ namespace SCC_Detection_Test
             DCSC dcsc = new DCSC(1);
             ResultSet results = dcsc.Compute(g);
 
-            Assert.IsTrue(results.List.Count == 10);
+            Assert.IsTrue(results.List.Count == size);
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < size; i++)
             {
                 Assert.IsTrue(results.Contains(i));
+            }
+        }
+
+        [TestMethod]
+        public void concurrencyRandomGraphTest()
+        {
+            int size = 300;
+
+            Graph g = RandomGraph.Generate(size, 0.05);
+
+            // BUG when using more threads, see github issue
+            DCSC dcsc = new DCSC(10);
+            ResultSet results = dcsc.Compute(g);
+            
+            for (int i = 0; i < results.List.Count; i++)
+            {
+                Assert.IsTrue(g.IsSCC(results.List[i]));
             }
         }
     }

@@ -6,7 +6,7 @@ using SCC_Detection.Datastructures;
 
 namespace SCC_Detection.Input
 {
-    class RandomGraph
+    public class RandomGraph
     {
         public static Graph Generate(int n, double p)
         {
