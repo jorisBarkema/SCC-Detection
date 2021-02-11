@@ -1,5 +1,5 @@
 ﻿using System;
-
+using System.Diagnostics;
 using SCC_Detection.Datastructures;
 using SCC_Detection.Input;
 using SCC_Detection.SCCDetectors;
@@ -10,36 +10,37 @@ namespace SCC_Detection
     {
         static void Main(string[] args)
         {
-            if (args.Length < 3) throw new Exception("Too few arguments given");
+            if (args.Length < 4) throw new Exception("Too few arguments given");
 
-            int threads = int.Parse(args[0]);
-            string algorithms = args[1];
+            int tests = int.Parse(args[0]);
+            int threads = int.Parse(args[1]);
+            string algorithms = args[2];
 
             SCCDetector[] detectors = ToSCCDetectors(algorithms, threads);
 
             Graph g;
-            string input = args[2];
+            string input = args[3];
 
             Console.WriteLine($"Testing {algorithms} on {threads} thread(s) with graph:");
 
             switch (input)
             {
                 case "file":
-                    if (args.Length == 5)
+                    if (args.Length == 6)
                     {
-                        g = CreateFileGraph(args[3], args[4], detectors);
-                    } else if (args.Length == 4)
+                        g = CreateFileGraph(args[4], args[5], detectors);
+                    } else if (args.Length == 5)
                     {
-                        g = CreateFileGraph(args[3], "LIST", detectors);
+                        g = CreateFileGraph(args[4], "LIST", detectors);
                     } else
                     {
                         throw new Exception("Invalid arguments given for file input");
                     }
                     break;
                 case "random":
-                    if (args.Length == 5)
+                    if (args.Length == 6)
                     {
-                        g = CreateRandomGraph(int.Parse(args[3]), double.Parse(args[4]), detectors);
+                        g = CreateRandomGraph(int.Parse(args[4]), double.Parse(args[5]), detectors);
                     }
                     else
                     {
@@ -55,14 +56,37 @@ namespace SCC_Detection
 
             //TODO: timing for the analysis
 
-            Console.WriteLine(g.ToString());
+            //Console.WriteLine(g.ToString());
+
+            // Run at highest priority to minimize fluctuations caused by other processes/threads
+            Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
+
+            Stopwatch stopwatch = new Stopwatch();
 
             foreach (SCCDetector detector in detectors)
             {
-                ResultSet r = detector.Compute(g);
-                Console.WriteLine(r);
+                for(int i = 0; i < tests; i++)
+                {
+                    // clean up
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect();
+
+                    stopwatch.Start();
+
+                    ResultSet r = detector.Compute(g);
+
+                    stopwatch.Stop();
+                    
+                    //Console.WriteLine(r);
+
+                    long elapsedTime = stopwatch.ElapsedMilliseconds;
+                    Console.WriteLine(detector.Name + ": " + elapsedTime + "ms");
+                    stopwatch.Reset();
+                }
             }
 
+            Console.WriteLine("\nDone");
             Console.ReadLine();
         }
 

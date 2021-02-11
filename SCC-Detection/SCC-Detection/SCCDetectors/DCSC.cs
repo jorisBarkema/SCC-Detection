@@ -11,7 +11,6 @@ namespace SCC_Detection.SCCDetectors
 {
     public class DCSC : SCCDetector
     {
-        //CancellationTokenSource source = new CancellationTokenSource();
         readonly object pulseLock = new object();
 
         ResultSet result;
@@ -23,6 +22,8 @@ namespace SCC_Detection.SCCDetectors
 
         public DCSC(int threadcount)
         {
+            this.Name = "DCSC";
+
             this.threadcount = threadcount;
             this.status = new bool[threadcount];
 
@@ -41,20 +42,16 @@ namespace SCC_Detection.SCCDetectors
 
             Thread[] threads = new Thread[threadcount];
 
-            //CancellationToken token = source.Token;
-
             for (int i = 0; i < threadcount; i++)
             {
                 // Make a copy to capture the variable
                 // https://stackoverflow.com/questions/271440/captured-variable-in-a-loop-in-c-sharp
                 int copy = i;
-                //threads[copy] = new Thread(() => ThreadTask(copy));
-                threads[copy] = new Thread(new ThreadStart(() => ThreadTask(copy)));
+
+                threads[copy] = new Thread(new ThreadStart(() => DCSCTask(copy)));
                 threads[copy].Start();
             }
-
-            //Task.WaitAny(tasks);
-
+            
             for (int i = 0; i < threadcount; i++)
             {
                 threads[i].Join();
@@ -63,7 +60,7 @@ namespace SCC_Detection.SCCDetectors
             return this.result;
         }
 
-        private void ThreadTask(int id)
+        private void DCSCTask(int id)
         {
             HashSet<int> subgraph;
             
@@ -92,28 +89,6 @@ namespace SCC_Detection.SCCDetectors
                     Monitor.Wait(pulseLock);
                 }
             }
-            
-            /*
-            while (true)
-            {
-                while (taskList.Count == 0)
-                {
-                    this.status[id] = true;
-
-                    if (this.Done()) {
-                        Monitor.Pulse(taskList);
-                        return;
-                    }
-
-                    Monitor.Wait(taskList);
-                }
-
-                this.status[id] = false;
-                subgraph = taskList.TryDequeue();
-                
-                ProcessSubgraph(subgraph);
-            }
-            */
         }
 
         private void ProcessSubgraph(HashSet<int> subgraph)

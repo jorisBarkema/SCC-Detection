@@ -7,6 +7,8 @@ namespace SCC_Detection.SCCDetectors
 {
     public abstract class SCCDetector
     {
+        public string Name;
+
         public abstract ResultSet Compute(Graph g);
     }
 }
