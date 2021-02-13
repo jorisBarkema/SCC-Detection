@@ -11,11 +11,35 @@ namespace SCC_Detection_Test
     [TestClass]
     public class GraphTest
     {
+        private Dictionary<int, List<int>> testMap;
+
+        [TestInitialize] //this doesn't work!
+        public void InitializeTest()
+        {
+            this.testMap = new Dictionary<int, List<int>>();
+        }
+
+        /// <summary>
+        /// 0 --> 1 --> 2 <--> 3 <-- 4
+        /// </summary>
+        private void singleLoopGraph()
+        {
+            testMap[0] = new List<int>();
+            testMap[1] = new List<int>();
+            testMap[2] = new List<int>();
+            testMap[3] = new List<int>();
+            testMap[4] = new List<int>();
+
+            testMap[0].Add(1);
+            testMap[1].Add(2);
+            testMap[2].Add(3);
+            testMap[3].Add(2);
+            testMap[4].Add(3);
+        }
+
         [TestMethod]
         public void EmptyDictNoErrorsTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
-
             Graph g = new Graph(testMap);
 
             Assert.AreEqual(g.GetMap().Keys.Count, 0);
@@ -26,7 +50,6 @@ namespace SCC_Detection_Test
         "Graph map includes non-existing ID 3.")]
         public void InvalidGraphTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
             testMap[0] = new List<int>();
             testMap[0].Add(1);
             testMap[0].Add(3);
@@ -38,7 +61,6 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void InitializationTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
             testMap[0] = new List<int>();
             testMap[0].Add(1);
             testMap[0].Add(2);
@@ -68,7 +90,6 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void ReachableTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
             testMap[0] = new List<int>();
             testMap[0].Add(1);
             testMap[0].Add(2);
@@ -93,7 +114,6 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void SingleSCCTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
             testMap[0] = new List<int>();
             testMap[0].Add(1);
             testMap[0].Add(2);
@@ -110,7 +130,6 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void MoreSCCsTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
             testMap[0] = new List<int>();
             testMap[0].Add(1);
             testMap[0].Add(2);
@@ -129,7 +148,6 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void TrivialSCCsTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
             testMap[0] = new List<int>();
             testMap[1] = new List<int>();
             testMap[2] = new List<int>();
@@ -143,6 +161,46 @@ namespace SCC_Detection_Test
             Assert.IsFalse(g.IsSCC(new HashSet<int> { 0, 1 }));
             Assert.IsFalse(g.IsSCC(new HashSet<int> { 1, 2 }));
             Assert.IsFalse(g.IsSCC(new HashSet<int> { 0, 2 }));
+        }
+
+        [TestMethod]
+        public void removeConnectionTest()
+        {
+            this.singleLoopGraph();
+
+            Graph g = new Graph(testMap);
+            g.RemoveConnection(0, 1);
+
+            Dictionary<int, List<int>> graphMap = g.GetMap();
+
+            CollectionAssert.AreEquivalent(new int[] { 1 }.ToList(), graphMap[0]);
+
+            graphMap = g.GetMap();
+
+            CollectionAssert.AreEquivalent(new int[] { }.ToList(), graphMap[0]);
+        }
+
+        [TestMethod]
+        public void removeVertexTest()
+        {
+
+        }
+
+        [TestMethod]
+        public void immediateSuccessorsTest()
+        {
+
+        }
+
+        [TestMethod]
+        public void immediatePredecessorsTest()
+        {
+
+        }
+        [TestMethod]
+        public void immediateSuccessorsSubgraphTest()
+        {
+
         }
     }
 }

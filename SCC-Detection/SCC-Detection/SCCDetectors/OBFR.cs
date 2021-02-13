@@ -9,7 +9,7 @@ using SCC_Detection.Datastructures;
 
 namespace SCC_Detection.SCCDetectors
 {
-    class Slice
+    public class Slice
     {
         public HashSet<int> subgraph;
         public HashSet<int> seeds;
@@ -21,7 +21,7 @@ namespace SCC_Detection.SCCDetectors
         }
     }
 
-    class OBFR : SCCDetector
+    public class OBFR : SCCDetector
     {
         ResultSet result;
         int threadcount;
@@ -118,19 +118,54 @@ namespace SCC_Detection.SCCDetectors
             Trim(slice);
         }
 
-        private HashSet<int> Trim(Slice slice)
+        public Slice Trim(Slice slice) => this.Trim(slice, this.g);
+
+        /// <summary>
+        /// Computes the slice without the trimmed vertices in the subgraph. 
+        /// Assumes all of the seeds are in the subgraph.
+        /// </summary>
+        /// <param name="slice"> The slice to be trimmed </param>
+        /// <returns>The trimmed slice</returns>
+        public Slice Trim(Slice slice, Graph g)
         {
-            throw new NotImplementedException();
+            Stack<int> trimStack = new Stack<int>(slice.seeds);
+
+            while (trimStack.Count > 0)
+            {
+                int id = trimStack.Pop();
+
+                if (g.InDegree(id) == 0)
+                {
+                    // Make a copy because you cannot directly alter the count of the list/array in a foreach loop
+                    List<int> successors = g.ImmediateSuccessors(id);
+                    int[] s = new int[successors.Count];
+                    successors.CopyTo(s);
+
+                    foreach (int v in s)
+                    {
+                        g.RemoveConnection(id, v);
+
+                        if (slice.subgraph.Contains(v))
+                        {
+                            trimStack.Push(v);
+                        }
+                    }
+
+                    slice.subgraph.Remove(id);
+                }
+            }
+
+            return slice;
         }
 
-        private HashSet<int> Backward(Slice slice)
+        public HashSet<int> Backward(Slice slice)
         {
-            throw new NotImplementedException();
+            return g.Backward(slice.seeds, slice.subgraph);
         }
 
-        private HashSet<int> NextSeeds(Slice slice)
+        public HashSet<int> NextSeeds(Slice slice)
         {
-            throw new NotImplementedException();
+            return g.ImmediateSuccessors(slice.seeds, slice.subgraph);
         }
 
         private bool Done()

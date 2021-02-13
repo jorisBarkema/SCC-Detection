@@ -456,6 +456,20 @@ namespace SCC_Detection.Datastructures
             return map[id];
         }
 
+        public HashSet<int> ImmediateSuccessors(HashSet<int> ids, HashSet<int> subgraph)
+        {
+            HashSet<int> result = new HashSet<int>();
+
+            foreach(int id in ids)
+            {
+                result.UnionWith(map[id]);
+            }
+
+            result.IntersectWith(subgraph);
+            result.ExceptWith(ids);
+            return result;
+        }
+
         public List<int> ImmediatePredecessors(int id)
         {
             if (!transposedMap.ContainsKey(id)) return null;
@@ -463,6 +477,26 @@ namespace SCC_Detection.Datastructures
             return transposedMap[id];
         }
 
+        public void RemoveConnection(int from, int to)
+        {
+            this.map[from].Remove(to);
+            this.transposedMap[to].Remove(from);
+        }
+        
+        public void RemoveNode(int id, bool deep = false)
+        {
+            // Remove this node and the connections from this node with it
+            this.map.Remove(id);
+
+            // Remove the connections to this node
+            foreach(int v in this.transposedMap[id])
+            {
+                this.map[v].Remove(id);
+            }
+
+            // Now we can delete the reference to the removed connections to this node
+            this.transposedMap.Remove(id);
+        }
 
         /// <summary>
         /// Utiliy function to test whether a subset is an SCC.

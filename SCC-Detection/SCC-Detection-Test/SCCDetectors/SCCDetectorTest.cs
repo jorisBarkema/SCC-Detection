@@ -12,63 +12,72 @@ using System.Linq;
 namespace SCC_Detection_Test
 {
     [TestClass]
-    public class DCSCTest
+    public class SCCDetectorTest
     {
+        private SCCDetector[] detectors;
+        private Dictionary<int, List<int>> testMap;
+
+        [TestInitialize] //this doesn't work!
+        public void InitializeTest()
+        {
+            //SCCDetectorTest.detectors = new SCCDetector[] { new DCSC(1), new OBFR(1) };
+            this.detectors = new SCCDetector[] { new DCSC(1) };
+            this.testMap = new Dictionary<int, List<int>>();
+        }
+
         [TestMethod]
         public void emptyGraphTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
-
             Graph g = new Graph(testMap);
 
-            DCSC dcsc = new DCSC(1);
-            ResultSet results = dcsc.Compute(g);
+            foreach(SCCDetector detector in this.detectors)
+            {
+                ResultSet results = detector.Compute(g);
 
-            Assert.AreEqual(results.Count(), 0);
+                Assert.AreEqual(results.Count(), 0);
+            }
         }
 
         [TestMethod]
         public void singletonTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
-
             testMap[0] = new List<int>();
 
             Graph g = new Graph(testMap);
 
-            DCSC dcsc = new DCSC(1);
-            ResultSet results = dcsc.Compute(g);
+            foreach (SCCDetector detector in this.detectors)
+            {
+                ResultSet results = detector.Compute(g);
 
-            Assert.IsTrue(results.List.Count == 1);
-            CollectionAssert.AreEquivalent(results.List[0].ToList(), new int[] { 0 });
+                Assert.IsTrue(results.List.Count == 1);
+                CollectionAssert.AreEquivalent(results.List[0].ToList(), new int[] { 0 });
+            }
         }
 
         [TestMethod]
         public void trivialComponentsTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
-
             testMap[0] = new List<int>();
             testMap[1] = new List<int>();
             testMap[2] = new List<int>();
 
             Graph g = new Graph(testMap);
 
-            DCSC dcsc = new DCSC(1);
-            ResultSet results = dcsc.Compute(g);
-
-            for (int i = 0; i < 3; i++)
+            foreach (SCCDetector detector in this.detectors)
             {
-                Assert.IsTrue(results.List.Count == 3);
-                Assert.IsTrue(results.Contains(i));
+                ResultSet results = detector.Compute(g);
+
+                for (int i = 0; i < 3; i++)
+                {
+                    Assert.IsTrue(results.List.Count == 3);
+                    Assert.IsTrue(results.Contains(i));
+                }
             }
         }
 
         [TestMethod]
         public void singleComponentTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
-
             testMap[0] = new List<int>();
             testMap[1] = new List<int>();
             testMap[2] = new List<int>();
@@ -79,18 +88,18 @@ namespace SCC_Detection_Test
 
             Graph g = new Graph(testMap);
 
-            DCSC dcsc = new DCSC(1);
-            ResultSet results = dcsc.Compute(g);
-
-            Assert.IsTrue(results.List.Count == 1);
-            CollectionAssert.AreEquivalent(results.List[0].ToList(), new int[] { 0, 1, 2 });
+            foreach (SCCDetector detector in this.detectors)
+            {
+                ResultSet results = detector.Compute(g);
+                
+                Assert.IsTrue(results.List.Count == 1);
+                CollectionAssert.AreEquivalent(results.List[0].ToList(), new int[] { 0, 1, 2 });
+            }
         }
 
         [TestMethod]
         public void NonTrivialComponentsTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
-
             testMap[0] = new List<int>();
             testMap[1] = new List<int>();
             testMap[2] = new List<int>();
@@ -106,20 +115,20 @@ namespace SCC_Detection_Test
 
             Graph g = new Graph(testMap);
 
-            DCSC dcsc = new DCSC(1);
-            ResultSet results = dcsc.Compute(g);
+            foreach (SCCDetector detector in this.detectors)
+            {
+                ResultSet results = detector.Compute(g);
 
-            Assert.IsTrue(results.List.Count == 2);
-            CollectionAssert.AreEquivalent(results.SCCById(0).ToList(), new int[] { 0, 1, 2 });
-            CollectionAssert.AreEquivalent(results.SCCById(3).ToList(), new int[] { 3, 4 });
+                Assert.IsTrue(results.List.Count == 2);
+                CollectionAssert.AreEquivalent(results.SCCById(0).ToList(), new int[] { 0, 1, 2 });
+                CollectionAssert.AreEquivalent(results.SCCById(3).ToList(), new int[] { 3, 4 });
+            }
         }
 
         [TestMethod]
         public void concurrencyTrivialComponentsTest()
         {
-            Dictionary<int, List<int>> testMap = new Dictionary<int, List<int>>();
-
-            int size = 10000;
+            int size = 100;
 
             for (int i = 0; i < size; i++)
             {
@@ -143,7 +152,7 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void concurrencyRandomGraphTest()
         {
-            int size = 300;
+            int size = 50;
 
             Graph g = RandomGraph.Generate(size, 0.05);
 
