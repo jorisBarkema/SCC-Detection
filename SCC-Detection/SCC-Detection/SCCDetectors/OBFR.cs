@@ -23,7 +23,7 @@ namespace SCC_Detection.SCCDetectors
 
     public class OBFR : SCCDetector
     {
-        ResultSet result;
+        public ResultSet Result { get; private set; }
         int threadcount;
         Graph g;
 
@@ -36,6 +36,9 @@ namespace SCC_Detection.SCCDetectors
         {
             this.Name = "OBFR";
             this.threadcount = threadcount;
+            this.status = new bool[threadcount];
+            this.Result = new ResultSet();
+            this.taskList = new ConcurrentQueue<Slice>();
         }
 
 
@@ -46,17 +49,13 @@ namespace SCC_Detection.SCCDetectors
             // Divide the graph into rooted subgraphs
             HashSet<int> total = g.Vertices();
 
-            while (total.Count > 0)
+            List<Slice> slices = this.ToRootedSlices(total);
+
+            foreach(Slice slice in slices)
             {
-                int pivot = g.PivotFromSet(total);
-                HashSet<int> forward = g.Forward(pivot, total);
-
-                Slice s = new Slice(forward, new HashSet<int>(pivot));
-                taskList.Enqueue(s);
-
-                total.ExceptWith(forward);
+                taskList.Enqueue(slice);
             }
-
+            
             Task[] tasks = new Task[threadcount];
 
             Thread[] threads = new Thread[threadcount];
@@ -78,7 +77,7 @@ namespace SCC_Detection.SCCDetectors
                 threads[i].Join();
             }
 
-            return this.result;
+            return this.Result;
 
         }
 
@@ -118,11 +117,34 @@ namespace SCC_Detection.SCCDetectors
             while(slice.subgraph.Count > 0)
             {
                 Slice trimmed = Trim(slice);
-                Slice recursor = Backward(trimmed);
+                HashSet<int> recursiveSubgraph = Backward(trimmed);
 
-                HashSet<int> nextSeeds = g.ImmediateSuccessors(slice.seeds, slice.subgraph);
-                slice.subgraph.ExceptWith(recursor.subgraph);
-                slice.seeds = nextSeeds;
+                // Since the slice is rooted from the original seed 
+                // all current seeds together can reach everything that is remaining
+                // If the backward closure of the slice is the entire slice
+                // Then the seeds can reach everything, and everything can reach the seeds, so it is one SCC
+                if (trimmed.subgraph.Count == recursiveSubgraph.Count)
+                {
+                    Result.Add(recursiveSubgraph);
+                    return;
+                } else
+                {
+                    List<Slice> rootedSlices = this.ToRootedSlices(recursiveSubgraph);
+
+                    foreach (Slice rootedSlice in rootedSlices)
+                    {
+                        taskList.Enqueue(rootedSlice);
+                    }
+
+                    lock (pulseLock)
+                    {
+                        Monitor.PulseAll(pulseLock);
+                    }
+
+                    HashSet<int> nextSeeds = g.ImmediateSuccessors(slice.seeds, slice.subgraph);
+                    slice.subgraph.ExceptWith(recursiveSubgraph);
+                    slice.seeds = nextSeeds;
+                }
             }
             
 
@@ -147,21 +169,21 @@ namespace SCC_Detection.SCCDetectors
 
                 if (g.InDegree(id) == 0)
                 {
+                    // The node is a trivial SCC
+                    Result.Add(new HashSet<int> { id });
+
                     // Make a copy because you cannot directly alter the count of the list/array in a foreach loop
                     List<int> successors = g.ImmediateSuccessors(id);
-                    int[] s = new int[successors.Count];
-                    successors.CopyTo(s);
 
-                    foreach (int v in s)
+                    foreach (int v in successors)
                     {
-                        g.RemoveConnection(id, v);
-
                         if (slice.subgraph.Contains(v))
                         {
                             trimStack.Push(v);
                         }
                     }
 
+                    g.RemoveNode(id);
                     slice.subgraph.Remove(id);
                 }
             }
@@ -174,15 +196,30 @@ namespace SCC_Detection.SCCDetectors
         /// </summary>
         /// <param name="slice"></param>
         /// <returns></returns>
-        public Slice Backward(Slice slice)
+        public HashSet<int> Backward(Slice slice)
         {
-            HashSet<int> nextSubgraph = g.Backward(slice.seeds, slice.subgraph);
-            HashSet<int> nextSeeds = new HashSet<int>();
-            nextSeeds.Add(g.PivotFromSet(nextSubgraph));
+            return g.Backward(slice.seeds, slice.subgraph);
+        }
 
-            Slice s = new Slice(nextSubgraph, nextSeeds);
+        private List<Slice> ToRootedSlices(HashSet<int> subgraph)
+        {
+            // Divide the graph into rooted subgraphs
+            //HashSet<int> total = g.Vertices();
 
-            return s;
+            List<Slice> slices = new List<Slice>();
+
+            while (subgraph.Count > 0)
+            {
+                int pivot = g.PivotFromSet(subgraph);
+                HashSet<int> forward = g.Forward(pivot, subgraph);
+
+                Slice s = new Slice(forward, new HashSet<int> { pivot });
+                slices.Add(s);
+
+                subgraph.ExceptWith(forward);
+            }
+
+            return slices;
         }
 
         private bool Done()

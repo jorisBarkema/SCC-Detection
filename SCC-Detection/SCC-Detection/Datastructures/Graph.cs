@@ -494,9 +494,9 @@ namespace SCC_Detection.Datastructures
             this.map.Remove(id);
 
             // Remove the connections to this node
-            foreach(int v in this.transposedMap[id])
+            foreach(int v in this.map[id])
             {
-                this.map[v].Remove(id);
+                this.RemoveConnection(id, v);
             }
 
             // Now we can delete the reference to the removed connections to this node

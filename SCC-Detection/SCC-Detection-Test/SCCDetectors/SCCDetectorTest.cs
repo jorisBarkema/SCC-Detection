@@ -17,11 +17,11 @@ namespace SCC_Detection_Test
         private SCCDetector[] detectors;
         private Dictionary<int, List<int>> testMap;
 
-        [TestInitialize] //this doesn't work!
+        [TestInitialize]
         public void InitializeTest()
         {
-            //SCCDetectorTest.detectors = new SCCDetector[] { new DCSC(1), new OBFR(1) };
-            this.detectors = new SCCDetector[] { new DCSC(1) };
+            this.detectors = new SCCDetector[] { new DCSC(1), new OBFR(1) };
+            //this.detectors = new SCCDetector[] { new DCSC(1) };
             this.testMap = new Dictionary<int, List<int>>();
         }
 
@@ -113,6 +113,7 @@ namespace SCC_Detection_Test
             testMap[3].Add(4);
             testMap[4].Add(3);
 
+            // 0/1/2 --> 3/4 two cycles
             Graph g = new Graph(testMap);
 
             foreach (SCCDetector detector in this.detectors)

@@ -3,6 +3,7 @@ using SCC_Detection.Datastructures;
 using SCC_Detection.SCCDetectors;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace SCC_Detection_Test
@@ -13,7 +14,7 @@ namespace SCC_Detection_Test
         private OBFR obfr;
         private Dictionary<int, List<int>> testMap;
 
-        [TestInitialize] //this doesn't work!
+        [TestInitialize]
         public void InitializeTest()
         {
             //SCCDetectorTest.detectors = new SCCDetector[] { new DCSC(1), new OBFR(1) };
@@ -115,6 +116,25 @@ namespace SCC_Detection_Test
             Assert.IsFalse(result.subgraph.Contains(4));
             Assert.IsTrue(result.subgraph.Contains(2));
             Assert.IsTrue(result.subgraph.Contains(3));
+        }
+
+        [TestMethod]
+        public void trimTestResult()
+        {
+            this.singleLoopGraph();
+
+            Graph g = new Graph(this.testMap);
+            // The full graph with 0 as seed
+            Slice slice = new Slice(new HashSet<int>(new int[] { 0, 1, 2, 3, 4 }), new HashSet<int>(new int[] { 0 }));
+
+            this.obfr.Trim(slice, g);
+
+            ResultSet result = this.obfr.Result;
+
+            Assert.IsTrue(result.Contains(0));
+            Assert.IsTrue(result.Contains(1));
+            CollectionAssert.AreEquivalent(new int[] { 0 }, result.SCCById(0).ToList());
+            CollectionAssert.AreEquivalent(new int[] { 1 }, result.SCCById(1).ToList());
         }
     }
 }
