@@ -456,6 +456,11 @@ namespace SCC_Detection.Datastructures
             return map[id];
         }
 
+        public HashSet<int> ImmediateSuccessors(HashSet<int> ids)
+        {
+            return this.ImmediateSuccessors(ids, this.Vertices());
+        }
+
         public HashSet<int> ImmediateSuccessors(HashSet<int> ids, HashSet<int> subgraph)
         {
             HashSet<int> result = new HashSet<int>();
@@ -483,7 +488,7 @@ namespace SCC_Detection.Datastructures
             this.transposedMap[to].Remove(from);
         }
         
-        public void RemoveNode(int id, bool deep = false)
+        public void RemoveNode(int id)
         {
             // Remove this node and the connections from this node with it
             this.map.Remove(id);

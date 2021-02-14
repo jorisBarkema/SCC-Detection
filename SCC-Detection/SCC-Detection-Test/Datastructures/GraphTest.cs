@@ -37,6 +37,23 @@ namespace SCC_Detection_Test
             testMap[4].Add(3);
         }
 
+        /// <summary>
+        /// 0 --> 1 --> 2 <-- 3 <-- 4
+        /// </summary>
+        private void pyramidGraph()
+        {
+            testMap[0] = new List<int>();
+            testMap[1] = new List<int>();
+            testMap[2] = new List<int>();
+            testMap[3] = new List<int>();
+            testMap[4] = new List<int>();
+
+            testMap[0].Add(1);
+            testMap[1].Add(2);
+            testMap[3].Add(2);
+            testMap[4].Add(3);
+        }
+
         [TestMethod]
         public void EmptyDictNoErrorsTest()
         {
@@ -169,38 +186,83 @@ namespace SCC_Detection_Test
             this.singleLoopGraph();
 
             Graph g = new Graph(testMap);
-            g.RemoveConnection(0, 1);
 
             Dictionary<int, List<int>> graphMap = g.GetMap();
 
             CollectionAssert.AreEquivalent(new int[] { 1 }.ToList(), graphMap[0]);
 
+            g.RemoveConnection(0, 1);
             graphMap = g.GetMap();
 
             CollectionAssert.AreEquivalent(new int[] { }.ToList(), graphMap[0]);
+            CollectionAssert.AreEquivalent(new int[] { 3 }.ToList(), graphMap[2]);
+
+            g.RemoveConnection(2, 3);
+            graphMap = g.GetMap();
+
+            CollectionAssert.AreEquivalent(new int[] { }.ToList(), graphMap[2]);
         }
 
         [TestMethod]
-        public void removeVertexTest()
+        public void removeNodeTest()
         {
+            this.singleLoopGraph();
 
+            Graph g = new Graph(testMap);
+
+            Dictionary<int, List<int>> graphMap = g.GetMap();
+
+            CollectionAssert.AreEquivalent(new int[] { 1 }.ToList(), graphMap[0]);
+
+            Assert.IsTrue(graphMap.ContainsKey(1));
+            g.RemoveNode(1);
+            graphMap = g.GetMap();
+
+            CollectionAssert.AreEquivalent(new int[] { }.ToList(), graphMap[0]);
+            Assert.IsFalse(graphMap.ContainsKey(1));
         }
 
         [TestMethod]
         public void immediateSuccessorsTest()
         {
+            this.pyramidGraph();
 
+            Graph g = new Graph(testMap);
+
+            CollectionAssert.AreEquivalent(new int[] { 1 }.ToList(), g.ImmediateSuccessors(0));
+            CollectionAssert.AreEquivalent(new int[] { 3 }.ToList(), g.ImmediateSuccessors(4));
         }
 
         [TestMethod]
         public void immediatePredecessorsTest()
         {
+            this.pyramidGraph();
 
+            Graph g = new Graph(testMap);
+
+            CollectionAssert.AreEquivalent(new int[] { 0 }.ToList(), g.ImmediatePredecessors(1));
+            CollectionAssert.AreEquivalent(new int[] { 4 }.ToList(), g.ImmediatePredecessors(3));
+            CollectionAssert.AreEquivalent(new int[] { 1, 3 }.ToList(), g.ImmediatePredecessors(2));
         }
+
         [TestMethod]
         public void immediateSuccessorsSubgraphTest()
         {
+            this.pyramidGraph();
 
+            Graph g = new Graph(testMap);
+
+            HashSet<int> seeds = new HashSet<int>();
+            seeds.Add(0);
+            seeds.Add(4);
+
+            HashSet<int> subgraph = new HashSet<int>();
+            subgraph.Add(0);
+            subgraph.Add(1);
+            subgraph.Add(2);
+
+            CollectionAssert.AreEquivalent(new int[] { 1, 3 }.ToList(), g.ImmediateSuccessors(seeds).ToList());
+            CollectionAssert.AreEquivalent(new int[] { 1 }.ToList(), g.ImmediateSuccessors(seeds, subgraph).ToList());
         }
     }
 }

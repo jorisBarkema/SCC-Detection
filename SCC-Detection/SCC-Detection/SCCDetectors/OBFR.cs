@@ -92,7 +92,7 @@ namespace SCC_Detection.SCCDetectors
 
                 while (taskList.TryDequeue(out slice))
                 {
-                    ProcessSubgraph(slice);
+                    ProcessSLice(slice);
                 }
 
                 this.status[id] = true;
@@ -113,9 +113,20 @@ namespace SCC_Detection.SCCDetectors
             }
         }
 
-        private void ProcessSubgraph(Slice slice)
+        private void ProcessSLice(Slice slice)
         {
-            Trim(slice);
+            while(slice.subgraph.Count > 0)
+            {
+                Slice trimmed = Trim(slice);
+                Slice recursor = Backward(trimmed);
+
+                HashSet<int> nextSeeds = g.ImmediateSuccessors(slice.seeds, slice.subgraph);
+                slice.subgraph.ExceptWith(recursor.subgraph);
+                slice.seeds = nextSeeds;
+            }
+            
+
+            //HashSet<int> nextSeeds = NextSeeds(trimmed);
         }
 
         public Slice Trim(Slice slice) => this.Trim(slice, this.g);
@@ -158,14 +169,20 @@ namespace SCC_Detection.SCCDetectors
             return slice;
         }
 
-        public HashSet<int> Backward(Slice slice)
+        /// <summary>
+        /// Calculate the backward closure of the seeds and make it into a new slice with a random pivot
+        /// </summary>
+        /// <param name="slice"></param>
+        /// <returns></returns>
+        public Slice Backward(Slice slice)
         {
-            return g.Backward(slice.seeds, slice.subgraph);
-        }
+            HashSet<int> nextSubgraph = g.Backward(slice.seeds, slice.subgraph);
+            HashSet<int> nextSeeds = new HashSet<int>();
+            nextSeeds.Add(g.PivotFromSet(nextSubgraph));
 
-        public HashSet<int> NextSeeds(Slice slice)
-        {
-            return g.ImmediateSuccessors(slice.seeds, slice.subgraph);
+            Slice s = new Slice(nextSubgraph, nextSeeds);
+
+            return s;
         }
 
         private bool Done()
