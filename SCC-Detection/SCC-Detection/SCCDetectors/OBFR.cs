@@ -117,6 +117,10 @@ namespace SCC_Detection.SCCDetectors
             while(slice.subgraph.Count > 0)
             {
                 Slice trimmed = Trim(slice);
+
+                // If it is fully trimmed we are done
+                if (trimmed.subgraph.Count == 0) return;
+
                 HashSet<int> recursiveSubgraph = Backward(trimmed);
 
                 // Since the slice is rooted from the original seed 
@@ -162,6 +166,7 @@ namespace SCC_Detection.SCCDetectors
         public Slice Trim(Slice slice, Graph g)
         {
             Stack<int> trimStack = new Stack<int>(slice.seeds);
+            HashSet<int> seeds = new HashSet<int>();
 
             while (trimStack.Count > 0)
             {
@@ -185,9 +190,12 @@ namespace SCC_Detection.SCCDetectors
 
                     g.RemoveNode(id);
                     slice.subgraph.Remove(id);
+                } else
+                {
+                    seeds.Add(id);
                 }
             }
-
+            slice.seeds = seeds;
             return slice;
         }
 
