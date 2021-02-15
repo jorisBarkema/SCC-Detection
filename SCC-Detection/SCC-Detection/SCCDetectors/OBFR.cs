@@ -129,6 +129,10 @@ namespace SCC_Detection.SCCDetectors
                     return;
                 } else
                 {
+                    HashSet<int> nextSeeds = g.ImmediateSuccessors(recursiveSubgraph, slice.subgraph);
+                    slice.subgraph.ExceptWith(recursiveSubgraph);
+                    slice.seeds = nextSeeds;
+
                     List<Slice> rootedSlices = this.ToRootedSlices(recursiveSubgraph);
 
                     foreach (Slice rootedSlice in rootedSlices)
@@ -140,10 +144,6 @@ namespace SCC_Detection.SCCDetectors
                     {
                         Monitor.PulseAll(pulseLock);
                     }
-
-                    HashSet<int> nextSeeds = g.ImmediateSuccessors(slice.seeds, slice.subgraph);
-                    slice.subgraph.ExceptWith(recursiveSubgraph);
-                    slice.seeds = nextSeeds;
                 }
             }
             

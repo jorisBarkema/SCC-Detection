@@ -490,16 +490,28 @@ namespace SCC_Detection.Datastructures
         
         public void RemoveNode(int id)
         {
-            // Remove this node and the connections from this node with it
-            this.map.Remove(id);
+            // Remove the connections with the node
+            // Make a copy because you cannot alter the iterator
+            int[] copy_successors = new int[this.map[id].Count];
+            this.map[id].CopyTo(copy_successors);
 
-            // Remove the connections to this node
-            foreach(int v in this.map[id])
+            foreach(int v in copy_successors)
             {
                 this.RemoveConnection(id, v);
             }
 
-            // Now we can delete the reference to the removed connections to this node
+            int[] copy_predecessors = new int[this.transposedMap[id].Count];
+            this.transposedMap[id].CopyTo(copy_predecessors);
+
+            foreach (int v in copy_predecessors)
+            {
+                this.RemoveConnection(v, id);
+            }
+
+            // Remove the node from the map
+            this.map.Remove(id);
+
+            // And the transposed map
             this.transposedMap.Remove(id);
         }
 
