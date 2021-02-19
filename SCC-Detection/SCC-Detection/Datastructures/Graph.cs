@@ -58,7 +58,7 @@ namespace SCC_Detection.Datastructures
                 if (totalSet.Contains(current) && !reachable.Contains(current))
                 {
                     reachable.Add(current);
-                    edge.Enqueue(current);
+                    //edge.Enqueue(current);
                 }
 
                 List<int> neighbours = map[current];
@@ -68,6 +68,7 @@ namespace SCC_Detection.Datastructures
                     // Look at the totalSet because we also use this for subgraphs
                     if (totalSet.Contains(neighbour) && !reachable.Contains(neighbour))
                     {
+                        //reachable.Add(neighbour);
                         edge.Enqueue(neighbour);
                     }
                 }

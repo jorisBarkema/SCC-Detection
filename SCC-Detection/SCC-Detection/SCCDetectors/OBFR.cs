@@ -123,15 +123,43 @@ namespace SCC_Detection.SCCDetectors
 
                 HashSet<int> recursiveSubgraph = Backward(trimmed);
 
+                /*
                 // Since the slice is rooted from the original seed 
                 // all current seeds together can reach everything that is remaining
                 // If the backward closure of the slice is the entire slice
                 // Then the seeds can reach everything, and everything can reach the seeds, so it is one SCC
+
+                // DIT GAAT MIS: zie case van draw.io
                 if (trimmed.subgraph.Count == recursiveSubgraph.Count)
                 {
                     Result.Add(recursiveSubgraph);
                     return;
-                } else
+                }
+                */
+
+                /*
+                if (recursiveSubgraph.Count == g.Backward(trimmed.seeds.First(), recursiveSubgraph).Count)
+                {
+                    Result.Add(recursiveSubgraph);
+                    return;
+                }
+                */
+
+                // Since the slice is rooted from the original seed 
+                // all current seeds together can reach everything that is remaining
+                // We already need the backward closure of the seeds as well
+                // If that is not equal than the slice is definitely not an SCC
+
+                // But this can still go wrong if the seeds are all disconnected
+                // Then together they can reach/be reached by anything, but not alone
+                // But if one random vertex in the subgraph can reach every seed, then it is an SCC.
+                if (trimmed.subgraph.Count == recursiveSubgraph.Count &&
+                    recursiveSubgraph.Count == g.Backward(g.PivotFromSet(recursiveSubgraph), recursiveSubgraph).Count)
+                {
+                    Result.Add(recursiveSubgraph);
+                    return;
+                }
+                else
                 {
                     HashSet<int> nextSeeds = g.ImmediateSuccessors(recursiveSubgraph, slice.subgraph);
                     slice.subgraph.ExceptWith(recursiveSubgraph);
@@ -190,6 +218,7 @@ namespace SCC_Detection.SCCDetectors
 
                     g.RemoveNode(id);
                     slice.subgraph.Remove(id);
+                    if (seeds.Contains(id)) seeds.Remove(id);
                 } else
                 {
                     seeds.Add(id);

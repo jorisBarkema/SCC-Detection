@@ -121,7 +121,7 @@ namespace SCC_Detection_Test
 
                 ResultSet results = detector.Compute(g);
 
-                Assert.IsTrue(results.List.Count == 2);
+                Assert.AreEqual(2, results.List.Count);
                 CollectionAssert.AreEquivalent(results.SCCById(0).ToList(), new int[] { 0, 1, 2 });
                 CollectionAssert.AreEquivalent(results.SCCById(3).ToList(), new int[] { 3, 4 });
             }
@@ -155,42 +155,37 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void concurrencyRandomGraphTest()
         {
-            int size = 50;
+            int size = 60;
 
             foreach(SCCDetector detector in this.concurrentDetectors)
             {
                 Graph g = RandomGraph.Generate(size, 0.05);
+                Graph original = new Graph(g.GetMap());
 
-                // BUG when using more threads, see github issue
                 ResultSet results = detector.Compute(g);
 
                 for (int i = 0; i < results.List.Count; i++)
                 {
-                    // This does not work right now because OBFR changes the actual graph
-                    // by removing nodes, so of course in this changed graph the SCCs are not correct.
-                    Assert.IsTrue(g.IsSCC(results.List[i]));
+                    Assert.IsTrue(original.IsSCC(results.List[i]));
                 }
             }
         }
-
-        // Takes too long for unit test
+        
         [TestMethod]
         public void concurrencySampleGraphTest()
         {
-            //int size = 300;
-
-            /*
-            Graph g = GraphParser.ReadFileSNAP(@"D:\Documents\computing_science\master thesis\graphs\Wiki-Vote.txt");
-
-            // BUG when using more threads, see github issue
-            DCSC dcsc = new DCSC(10);
-            ResultSet results = dcsc.Compute(g);
-
-            for (int i = 0; i < results.List.Count; i++)
+            foreach (SCCDetector detector in this.concurrentDetectors)
             {
-                Assert.IsTrue(g.IsSCC(results.List[i]));
+                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph.txt");
+                Graph original = new Graph(g.GetMap());
+
+                ResultSet results = detector.Compute(g);
+
+                for (int i = 0; i < results.List.Count; i++)
+                {
+                    Assert.IsTrue(original.IsSCC(results.List[i]));
+                }
             }
-            */
         }
     }
 }
