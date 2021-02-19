@@ -2,7 +2,7 @@
   "profiles": {
     "SCC-Detection": {
       "commandName": "Project",
-      "commandLineArgs": "10 4 DCSC file D:\\Documents\\computing_science\\master_thesis\\graphs\\Amazon0302.txt SNAP"
+      "commandLineArgs": "10 4 ALL file D:\\Documents\\computing_science\\master_thesis\\graphs\\email-Eu-core.txt SNAP"
     }
   }
 }

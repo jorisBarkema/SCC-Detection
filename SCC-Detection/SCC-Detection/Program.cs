@@ -112,8 +112,10 @@ namespace SCC_Detection
             {
                 case "DCSC":
                     return new SCCDetector[1] { new DCSC(threads) };
-                case "all":
-                    return new SCCDetector[1] { new DCSC(threads) };
+                case "OBFR":
+                    return new SCCDetector[1] { new OBFR(threads) };
+                case "ALL":
+                    return new SCCDetector[2] { new DCSC(threads), new OBFR(threads) };
                 default:
                     throw new Exception("Invalid algorithms input passed");
             }

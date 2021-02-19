@@ -10,6 +10,8 @@ namespace SCC_Detection.Datastructures
         private Dictionary<int, List<int>> map;
         private Dictionary<int, List<int>> transposedMap;
 
+        readonly object graphLock = new object();
+
         //private int nodeCount = 0;
         //private Dictionary<int, int> idMap = new Dictionary<int, int>();
         //private List<int> reverseIdMap = new List<int>();
@@ -63,10 +65,17 @@ namespace SCC_Detection.Datastructures
 
                 List<int> neighbours = map[current];
 
-                foreach(int neighbour in neighbours)
+                // Only look at neighbours in set
+                // Because OBFR changes the graph
+                // which changes the neighbours, causing an error
+                // but OBFR only changes the subgraph it is working on,
+                // so if we only look at the neighbours in the subgraph then this is no problem.
+                List<int> neighboursInSet = totalSet.Intersect(neighbours).ToList();
+
+                foreach(int neighbour in neighboursInSet)
                 {
                     // Look at the totalSet because we also use this for subgraphs
-                    if (totalSet.Contains(neighbour) && !reachable.Contains(neighbour))
+                    if (!reachable.Contains(neighbour))
                     {
                         //reachable.Add(neighbour);
                         edge.Enqueue(neighbour);
@@ -491,29 +500,33 @@ namespace SCC_Detection.Datastructures
         
         public void RemoveNode(int id)
         {
-            // Remove the connections with the node
-            // Make a copy because you cannot alter the iterator
-            int[] copy_successors = new int[this.map[id].Count];
-            this.map[id].CopyTo(copy_successors);
-
-            foreach(int v in copy_successors)
+            // Cannot remove two nodes at the same time which are connected to each other
+            lock(this.graphLock)
             {
-                this.RemoveConnection(id, v);
+                // Remove the connections with the node
+                // Make a copy because you cannot alter the iterator
+                int[] copy_successors = new int[this.map[id].Count];
+                this.map[id].CopyTo(copy_successors);
+
+                foreach (int v in copy_successors)
+                {
+                    this.RemoveConnection(id, v);
+                }
+
+                int[] copy_predecessors = new int[this.transposedMap[id].Count];
+                this.transposedMap[id].CopyTo(copy_predecessors);
+
+                foreach (int v in copy_predecessors)
+                {
+                    this.RemoveConnection(v, id);
+                }
+
+                // Remove the node from the map
+                this.map.Remove(id);
+
+                // And the transposed map
+                this.transposedMap.Remove(id);
             }
-
-            int[] copy_predecessors = new int[this.transposedMap[id].Count];
-            this.transposedMap[id].CopyTo(copy_predecessors);
-
-            foreach (int v in copy_predecessors)
-            {
-                this.RemoveConnection(v, id);
-            }
-
-            // Remove the node from the map
-            this.map.Remove(id);
-
-            // And the transposed map
-            this.transposedMap.Remove(id);
         }
 
         /// <summary>
