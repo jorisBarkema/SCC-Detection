@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace SCC_Detection.Datastructures
 {
@@ -36,27 +38,27 @@ namespace SCC_Detection.Datastructures
                 this.transposedMap = g.GetTransposedMap();
             }
         }
-
+        
         /// <summary>
-        /// Use standard BFS to find the reachable vertices.
+        /// Use parallel BFS to find the reachable vertices.
         /// </summary>
         /// <param name="fromSet">Set from which we start</param>
         /// <param name="totalSet">(Sub)set of the graph we want to include in the reachability search</param>
         /// <param name="map">Mapping from vertex to its neighbours</param>
         /// <returns>HashSet of the reachable vertices</returns>
-        public static HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
+        public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
-            Queue<int> edge = new Queue<int>(fromSet);
+            ConcurrentQueue<int> edge = new ConcurrentQueue<int>(fromSet);
 
             HashSet<int> reachable = new HashSet<int>(fromSet);
 
             // Use the convention that a vertex can reach itself always,
             // Because that makes sense when defining a single vertex as a trivial SCC.
-            
-            while (edge.Count > 0)
-            {
-                int current = edge.Dequeue();
 
+            int current;
+
+            while (edge.TryDequeue(out current))
+            {
                 if (totalSet.Contains(current) && !reachable.Contains(current))
                 {
                     reachable.Add(current);
@@ -72,14 +74,17 @@ namespace SCC_Detection.Datastructures
                 // so if we only look at the neighbours in the subgraph then this is no problem.
                 List<int> neighboursInSet = totalSet.Intersect(neighbours).ToList();
 
-                foreach(int neighbour in neighboursInSet)
+                lock (graphLock)
                 {
-                    // Look at the totalSet because we also use this for subgraphs
-                    if (!reachable.Contains(neighbour))
+                    Parallel.ForEach(neighboursInSet, (neighbour) =>
                     {
-                        //reachable.Add(neighbour);
-                        edge.Enqueue(neighbour);
-                    }
+                        // Look at the totalSet because we also use this for subgraphs
+                        if (!reachable.Contains(neighbour))
+                        {
+                            //reachable.Add(neighbour);
+                            edge.Enqueue(neighbour);
+                        }
+                    });
                 }
             }
 

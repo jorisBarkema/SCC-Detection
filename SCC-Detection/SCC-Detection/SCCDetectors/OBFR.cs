@@ -122,29 +122,7 @@ namespace SCC_Detection.SCCDetectors
                 if (trimmed.subgraph.Count == 0) return;
 
                 HashSet<int> recursiveSubgraph = Backward(trimmed);
-
-                /*
-                // Since the slice is rooted from the original seed 
-                // all current seeds together can reach everything that is remaining
-                // If the backward closure of the slice is the entire slice
-                // Then the seeds can reach everything, and everything can reach the seeds, so it is one SCC
-
-                // DIT GAAT MIS: zie case van draw.io
-                if (trimmed.subgraph.Count == recursiveSubgraph.Count)
-                {
-                    Result.Add(recursiveSubgraph);
-                    return;
-                }
-                */
-
-                /*
-                if (recursiveSubgraph.Count == g.Backward(trimmed.seeds.First(), recursiveSubgraph).Count)
-                {
-                    Result.Add(recursiveSubgraph);
-                    return;
-                }
-                */
-
+                
                 // Since the slice is rooted from the original seed 
                 // all current seeds together can reach everything that is remaining
                 // We already need the backward closure of the seeds as well
