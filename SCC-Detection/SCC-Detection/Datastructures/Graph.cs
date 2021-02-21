@@ -40,7 +40,7 @@ namespace SCC_Detection.Datastructures
         }
         
         /// <summary>
-        /// Use BFS to find the reachable vertices.
+        /// Use parallel BFS to find the reachable vertices.
         /// </summary>
         /// <param name="fromSet">Set from which we start</param>
         /// <param name="totalSet">(Sub)set of the graph we want to include in the reachability search</param>
@@ -49,7 +49,6 @@ namespace SCC_Detection.Datastructures
         public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
             ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
-
             ConcurrentBag<int> reachable = new ConcurrentBag<int>();
 
             while (edge.Except(reachable).Count() > 0)
@@ -59,66 +58,27 @@ namespace SCC_Detection.Datastructures
                     if (!reachable.Contains(current))
                     {
                         reachable.Add(current);
-                        //edge.Enqueue(current);
                     }
 
                     List<int> neighbours = map[current];
 
                     // Only look at neighbours in set
                     // Because OBFR changes the graph
-                    // which changes the neighbours, causing an error
+                    // which changes the neighbours, causing an error in the ForEach
                     // but OBFR only changes the subgraph it is working on,
                     // so if we only look at the neighbours in the subgraph then this is no problem.
                     List<int> neighboursInSet = totalSet.Intersect(neighbours).ToList();
 
                     Parallel.ForEach(neighboursInSet, (neighbour) =>
                     {
-                        // Look at the totalSet because we also use this for subgraphs
                         if (!edge.Contains(neighbour))
                         {
-                            //reachable.Add(neighbour);
                             edge.Add(neighbour);
                         }
                     });
                 });
             }
             
-
-            /*
-            
-            int current;
-
-            while (edge.TryDequeue(out current))
-            {
-                if (totalSet.Contains(current) && !reachable.Contains(current))
-                {
-                    reachable.Add(current);
-                    //edge.Enqueue(current);
-                }
-
-                List<int> neighbours = map[current];
-
-                // Only look at neighbours in set
-                // Because OBFR changes the graph
-                // which changes the neighbours, causing an error
-                // but OBFR only changes the subgraph it is working on,
-                // so if we only look at the neighbours in the subgraph then this is no problem.
-                List<int> neighboursInSet = totalSet.Intersect(neighbours).ToList();
-                
-                Parallel.ForEach(neighboursInSet, (neighbour) =>
-                {
-                    // Look at the totalSet because we also use this for subgraphs
-                    if (!reachable.Contains(neighbour))
-                    {
-                        //reachable.Add(neighbour);
-                        edge.Enqueue(neighbour);
-                    }
-                });
-            }
-            */
-
-
-
             return new HashSet<int>(reachable);
             
         }
