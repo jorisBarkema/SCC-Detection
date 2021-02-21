@@ -70,7 +70,7 @@ namespace SCC_Detection.SCCDetectors
 
                 while (taskList.TryDequeue(out subgraph))
                 {
-                    Console.WriteLine("{0} processing subgraph", id);
+                    //Console.WriteLine("{0} processing subgraph", id);
                     ProcessSubgraph(subgraph);
                 }
 
