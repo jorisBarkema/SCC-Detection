@@ -36,6 +36,8 @@ namespace SCC_Detection.SCCDetectors
         {
             this.g = g;
 
+            //g.AddShortcuts(7);
+
             taskList.Enqueue(g.Vertices());
 
             Task[] tasks = new Task[threadcount];

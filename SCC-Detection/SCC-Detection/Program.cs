@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using SCC_Detection.Datastructures;
 using SCC_Detection.Input;
 using SCC_Detection.SCCDetectors;
@@ -68,6 +70,8 @@ namespace SCC_Detection
                 Console.WriteLine("Warming up " + detector.Name);
                 ResultSet r = detector.Compute(g);
 
+                List<long> durations = new List<long>();
+
                 for (int i = 0; i < tests; i++)
                 {
                     // clean up
@@ -85,13 +89,16 @@ namespace SCC_Detection
 
                     long elapsedTime = stopwatch.ElapsedMilliseconds;
                     Console.WriteLine(detector.Name + ": " + elapsedTime + "ms");
+                    durations.Add(elapsedTime);
                     stopwatch.Reset();
                 }
 
                 Console.WriteLine();
+                Console.WriteLine("Average duration: " + durations.Average() + "ms");
+                Console.WriteLine();
             }
 
-            Console.WriteLine("\nDone");
+            Console.WriteLine("Done");
             Console.ReadLine();
         }
 
