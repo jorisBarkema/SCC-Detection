@@ -65,7 +65,10 @@ namespace SCC_Detection
 
             foreach (SCCDetector detector in detectors)
             {
-                for(int i = 0; i < tests; i++)
+                Console.WriteLine("Warming up " + detector.Name);
+                ResultSet r = detector.Compute(g);
+
+                for (int i = 0; i < tests; i++)
                 {
                     // clean up
                     GC.Collect();
@@ -74,7 +77,7 @@ namespace SCC_Detection
 
                     stopwatch.Start();
 
-                    ResultSet r = detector.Compute(g);
+                    r = detector.Compute(g);
 
                     stopwatch.Stop();
                     
@@ -84,6 +87,8 @@ namespace SCC_Detection
                     Console.WriteLine(detector.Name + ": " + elapsedTime + "ms");
                     stopwatch.Reset();
                 }
+
+                Console.WriteLine();
             }
 
             Console.WriteLine("\nDone");

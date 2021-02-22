@@ -483,6 +483,18 @@ namespace SCC_Detection.Datastructures
             return transposedMap[id];
         }
 
+        public void AddConnection(int from, int to)
+        {
+            if (!this.map[from].Contains(to))
+            {
+                this.map[from].Add(to);
+            }
+
+            if (!this.transposedMap[to].Contains(from))
+            {
+                this.transposedMap[to].Add(from);
+            }
+        }
         public void RemoveConnection(int from, int to)
         {
             this.map[from].Remove(to);
