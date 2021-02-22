@@ -51,6 +51,9 @@ namespace SCC_Detection.Datastructures
             ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
             ConcurrentBag<int> reachable = new ConcurrentBag<int>();
 
+            //TODO: maximum number of threads
+            //https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.paralleloptions.maxdegreeofparallelism?redirectedfrom=MSDN&view=net-5.0#System_Threading_Tasks_ParallelOptions_MaxDegreeOfParallelism
+
             while (edge.Except(reachable).Count() > 0)
             {
                 Parallel.ForEach(edge, (current) =>
