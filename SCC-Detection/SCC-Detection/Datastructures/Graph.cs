@@ -245,18 +245,7 @@ namespace SCC_Detection.Datastructures
                 {
                     List<int> filtered = neighbours.FindAll(x => set.Contains(x));
                     result += filtered.Count;
-                    /*
-                    foreach (int neighbour in neighbours)
-                    {
-                        if (set.Contains(neighbour))
-                        {
-                            result++;
-                        }
-                    }
-                    */
                 }
-
-                //result++;
             }
 
             result += set.Count;
@@ -346,14 +335,15 @@ namespace SCC_Detection.Datastructures
         /// </summary>
         /// <param name="totalSet"></param>
         /// <returns></returns>
-        public HashSet<int> PivotSetSchudy(HashSet<int> totalSet)
+        public HashSet<int> pivotSetMultiPivot(HashSet<int> totalSet)
         {
             if (totalSet.Count == 0)
             {
                 return new HashSet<int>();
             }
 
-            int goal = MPlusN(totalSet) / 2;
+            //int goal = MPlusN(totalSet) / 2;
+            int goal = totalSet.Count / 2;
 
             int start = 0;
             int end = totalSet.Count;
@@ -376,7 +366,8 @@ namespace SCC_Detection.Datastructures
                 }
 
                 HashSet<int> setF = Reachable(fromSet, totalSet, map);
-                if (MPlusN(setF) >= goal)
+                //if (MPlusN(setF) >= goal)
+                if (setF.Count >= goal)
                 {
                     end = position;
                 }

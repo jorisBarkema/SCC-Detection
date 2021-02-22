@@ -114,8 +114,10 @@ namespace SCC_Detection
                     return new SCCDetector[1] { new DCSC(threads) };
                 case "OBFR":
                     return new SCCDetector[1] { new OBFR(threads) };
+                case "MULTIPIVOT":
+                    return new SCCDetector[1] { new MultiPivot(threads) };
                 case "ALL":
-                    return new SCCDetector[2] { new DCSC(threads), new OBFR(threads) };
+                    return new SCCDetector[3] { new DCSC(threads), new OBFR(threads), new MultiPivot(threads) };
                 default:
                     throw new Exception("Invalid algorithms input passed");
             }
