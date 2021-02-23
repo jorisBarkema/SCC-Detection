@@ -48,6 +48,11 @@ namespace SCC_Detection.Datastructures
         /// <returns>HashSet of the reachable vertices</returns>
         public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
+            return ParallelBFS(fromSet, totalSet, map);
+        }
+
+        private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
+        {
             ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
             ConcurrentBag<int> reachable = new ConcurrentBag<int>();
 
@@ -81,9 +86,8 @@ namespace SCC_Detection.Datastructures
                     });
                 });
             }
-            
+
             return new HashSet<int>(reachable);
-            
         }
 
         /// <summary>
