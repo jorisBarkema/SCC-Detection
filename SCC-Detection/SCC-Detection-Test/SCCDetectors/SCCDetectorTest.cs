@@ -21,8 +21,8 @@ namespace SCC_Detection_Test
         [TestInitialize]
         public void InitializeTest()
         {
-            this.detectors = new SCCDetector[] {  new OBFR(1), new DCSC(1) };
-            this.concurrentDetectors = new SCCDetector[] { new OBFR(10), new DCSC(10) };
+            this.detectors = new SCCDetector[] {  new OBFR(1), new DCSC(1), new MultiPivot(1) };
+            this.concurrentDetectors = new SCCDetector[] { new OBFR(10), new DCSC(10), new MultiPivot(10) };
             //this.detectors = new SCCDetector[] { new DCSC(1) };
             this.testMap = new Dictionary<int, List<int>>();
         }

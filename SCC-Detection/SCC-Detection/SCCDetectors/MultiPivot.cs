@@ -12,7 +12,7 @@ namespace SCC_Detection.SCCDetectors
     /// <summary>
     /// Almost exactly the same as DCSC, so quite a lot of repetitive code
     /// </summary>
-    class MultiPivot : SCCDetector
+    public class MultiPivot : SCCDetector
     {
         readonly object pulseLock = new object();
 
@@ -51,7 +51,7 @@ namespace SCC_Detection.SCCDetectors
                 // https://stackoverflow.com/questions/271440/captured-variable-in-a-loop-in-c-sharp
                 int copy = i;
 
-                threads[copy] = new Thread(new ThreadStart(() => DCSCTask(copy)));
+                threads[copy] = new Thread(new ThreadStart(() => MultiPivotTask(copy)));
                 threads[copy].Start();
             }
 
@@ -63,7 +63,7 @@ namespace SCC_Detection.SCCDetectors
             return this.result;
         }
 
-        private void DCSCTask(int id)
+        private void MultiPivotTask(int id)
         {
             HashSet<int> subgraph;
 
@@ -97,31 +97,31 @@ namespace SCC_Detection.SCCDetectors
         private void ProcessSubgraph(HashSet<int> subgraph)
         {
             if (subgraph.Count == 0) return;
+            
+            List<int> pivots = g.PivotSetMultiPivot(subgraph);
 
-            //int pivot = g.PivotFromSet(subgraph);
-            HashSet<int> pivots = g.pivotSetMultiPivot(subgraph);
+            if (pivots.Count == 0) return;
 
-            HashSet<int> forward = g.Forward(pivots, subgraph);
-            HashSet<int> backward = g.Backward(pivots, subgraph);
+            int s = pivots[pivots.Count - 1];
 
-            // Need to clone because IntersectWith modifies the existing set 
-            // and we need the original forward for th next step
-            HashSet<int> SCC = new HashSet<int>(forward, forward.Comparer);
-            SCC.IntersectWith(backward);
+            pivots.RemoveAt(pivots.Count - 1);
+
+            HashSet<int> remainingPivotsSet = new HashSet<int>(pivots);
+
+            HashSet<int> A = g.Forward(remainingPivotsSet, subgraph);
+            HashSet<int> B = g.Forward(s, subgraph);
+            HashSet<int> backward = g.Backward(s, subgraph);
+
+            HashSet<int> C = new HashSet<int>(B, B.Comparer);
+            C.IntersectWith(backward);
 
             // ResultSet has the locks so no need here
-            this.result.Add(SCC);
+            this.result.Add(C);
 
-            // Calculate the remainder set
-            subgraph.ExceptWith(forward);
-            subgraph.ExceptWith(backward);
-
-            forward.ExceptWith(SCC);
-            backward.ExceptWith(SCC);
-
-            this.taskList.Enqueue(subgraph);
-            this.taskList.Enqueue(forward);
-            this.taskList.Enqueue(backward);
+            this.taskList.Enqueue(new HashSet<int>(subgraph.Except(A.Union(B))));
+            this.taskList.Enqueue(new HashSet<int>(A.Except(B)));
+            this.taskList.Enqueue(new HashSet<int>(B.Except(A.Union(C))));
+            this.taskList.Enqueue(new HashSet<int>(A.Intersect(B).Except(C)));
 
             lock (pulseLock)
             {

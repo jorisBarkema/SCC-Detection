@@ -452,15 +452,15 @@ namespace SCC_Detection.Datastructures
 
         /// <summary>
         /// Find the pivot set for the next step of Schudy's algorithm
-        /// See "Finding strongly connectedcomponents in parallel using O (log2 n) reachability queries"
+        /// See "Finding strongly connected components in parallel using O (log2 n) reachability queries"
         /// </summary>
         /// <param name="totalSet"></param>
         /// <returns></returns>
-        public HashSet<int> pivotSetMultiPivot(HashSet<int> totalSet)
+        public List<int> PivotSetMultiPivot(HashSet<int> totalSet)
         {
             if (totalSet.Count == 0)
             {
-                return new HashSet<int>();
+                return new List<int>();
             }
 
             //int goal = MPlusN(totalSet) / 2;
@@ -498,7 +498,7 @@ namespace SCC_Detection.Datastructures
                 }
             }
 
-            HashSet<int> result = new HashSet<int>();
+            List<int> result = new List<int>();
 
             for (int i = 0; i < end; i++)
             {
