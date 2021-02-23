@@ -187,6 +187,81 @@ namespace SCC_Detection.Datastructures
             return result;
         }
 
+        /// <summary>
+        /// First non-parallel version of shortcutting, not following the paper per se,
+        /// just to see if it does something for the performance.
+        /// </summary>
+        /// <param name="depth">maximum depth of the BFS search</param>
+        public void AddShortcuts(int depth)
+        {
+            List<int> vertices = Vertices().ToList();
+            vertices = Shuffled(vertices);
+
+            Dictionary<int, bool> alive = new Dictionary<int, bool>();
+
+            foreach(int id in vertices)
+            {
+                alive[id] = true;
+            }
+
+            foreach(int id in vertices)
+            {
+                if (!alive[id]) continue;
+
+                alive[id] = false;
+
+                HashSet<int> cluster = DepthLimitedBFS(id, depth);
+
+                foreach(int target in cluster)
+                {
+                    AddConnection(id, target);
+                    alive[target] = false;
+                }
+            }
+        }
+
+
+        public HashSet<int> DepthLimitedBFS(int pivot, int depth)
+        {
+            // Item1 is the id, Item2 is the distance
+            Queue<Tuple<int, int>> edge = new Queue<Tuple<int, int>>();
+            edge.Enqueue(new Tuple<int, int>(pivot, 0));
+            Dictionary<int, int> reachable = new Dictionary<int, int>();
+            reachable[pivot] = 0;
+
+            // Use the convention that a vertex can reach itself always,
+            // Because that makes sense when defining a single vertex as a trivial SCC.
+
+            while (edge.Count > 0)
+            {
+                Tuple<int, int> current = edge.Dequeue();
+
+                if (!reachable.Keys.Contains(current.Item1))
+                {
+                    reachable[current.Item1] = current.Item2;
+                    //edge.Enqueue(current);
+                }
+
+                List<int> neighbours = map[current.Item1];
+                
+                foreach (int neighbour in neighbours)
+                {
+                    // Look at the totalSet because we also use this for subgraphs
+                    if (!reachable.Keys.Contains(neighbour))
+                    {
+                        //reachable.Add(neighbour);
+                        if (current.Item2 + 1 <= depth)
+                        {
+                            edge.Enqueue(new Tuple<int, int>(neighbour, current.Item2 + 1));
+                        }
+                    }
+                }
+            }
+
+            return new HashSet<int>(reachable.Keys);
+        }
+        
+
         /*
         /// <summary>
         /// Apparently there is a mapping from id to id? from something to id? From id to something?
@@ -245,18 +320,7 @@ namespace SCC_Detection.Datastructures
                 {
                     List<int> filtered = neighbours.FindAll(x => set.Contains(x));
                     result += filtered.Count;
-                    /*
-                    foreach (int neighbour in neighbours)
-                    {
-                        if (set.Contains(neighbour))
-                        {
-                            result++;
-                        }
-                    }
-                    */
                 }
-
-                //result++;
             }
 
             result += set.Count;
@@ -346,14 +410,15 @@ namespace SCC_Detection.Datastructures
         /// </summary>
         /// <param name="totalSet"></param>
         /// <returns></returns>
-        public HashSet<int> PivotSetSchudy(HashSet<int> totalSet)
+        public HashSet<int> pivotSetMultiPivot(HashSet<int> totalSet)
         {
             if (totalSet.Count == 0)
             {
                 return new HashSet<int>();
             }
 
-            int goal = MPlusN(totalSet) / 2;
+            //int goal = MPlusN(totalSet) / 2;
+            int goal = totalSet.Count / 2;
 
             int start = 0;
             int end = totalSet.Count;
@@ -376,7 +441,8 @@ namespace SCC_Detection.Datastructures
                 }
 
                 HashSet<int> setF = Reachable(fromSet, totalSet, map);
-                if (MPlusN(setF) >= goal)
+                //if (MPlusN(setF) >= goal)
+                if (setF.Count >= goal)
                 {
                     end = position;
                 }
@@ -492,6 +558,18 @@ namespace SCC_Detection.Datastructures
             return transposedMap[id];
         }
 
+        public void AddConnection(int from, int to)
+        {
+            if (!this.map[from].Contains(to))
+            {
+                this.map[from].Add(to);
+            }
+
+            if (!this.transposedMap[to].Contains(from))
+            {
+                this.transposedMap[to].Add(from);
+            }
+        }
         public void RemoveConnection(int from, int to)
         {
             this.map[from].Remove(to);

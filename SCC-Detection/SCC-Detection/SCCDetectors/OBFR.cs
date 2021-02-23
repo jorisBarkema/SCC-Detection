@@ -123,14 +123,20 @@ namespace SCC_Detection.SCCDetectors
 
                 HashSet<int> recursiveSubgraph = Backward(trimmed);
                 
-                // Since the slice is rooted from the original seed 
-                // all current seeds together can reach everything that is remaining
-                // We already need the backward closure of the seeds as well
-                // If that is not equal than the slice is definitely not an SCC
+                /*
+                 * Since the slice is rooted from the original seed 
+                 * all current seeds together can reach everything that is remaining
+                 * We already need the backward closure of the seeds as well
+                 * If that is not equal than the slice is definitely not an SCC
 
-                // But this can still go wrong if the seeds are all disconnected
-                // Then together they can reach/be reached by anything, but not alone
-                // But if one random vertex in the subgraph can reach every seed, then it is an SCC.
+                 * But this can still go wrong if the seeds are disconnected
+                 * Then together they can reach/be reached by anything, but not by themselves
+                 * However, if one random vertex in the subgraph can reach every seed, then it is an SCC.
+                 * Do the trimmed/resursiveSubgraph check first because these are already computed
+                 * If these match and there is a potential SCC then check if this is indeed the case.
+                 * Needs another computation of a backward closure
+                */
+
                 if (trimmed.subgraph.Count == recursiveSubgraph.Count &&
                     recursiveSubgraph.Count == g.Backward(g.PivotFromSet(recursiveSubgraph), recursiveSubgraph).Count)
                 {
@@ -165,7 +171,7 @@ namespace SCC_Detection.SCCDetectors
 
         /// <summary>
         /// Computes the slice without the trimmed vertices in the subgraph. 
-        /// Assumes all of the seeds are in the subgraph.
+        /// Assumes all of the seeds are part of the subgraph.
         /// </summary>
         /// <param name="slice"> The slice to be trimmed </param>
         /// <returns>The trimmed slice</returns>
@@ -219,7 +225,6 @@ namespace SCC_Detection.SCCDetectors
         private List<Slice> ToRootedSlices(HashSet<int> subgraph)
         {
             // Divide the graph into rooted subgraphs
-            //HashSet<int> total = g.Vertices();
 
             List<Slice> slices = new List<Slice>();
 

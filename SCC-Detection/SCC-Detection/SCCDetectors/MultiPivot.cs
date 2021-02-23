@@ -9,7 +9,10 @@ using System.Threading.Tasks;
 
 namespace SCC_Detection.SCCDetectors
 {
-    public class DCSC : SCCDetector
+    /// <summary>
+    /// Almost exactly the same as DCSC, so quite a lot of repetitive code
+    /// </summary>
+    class MultiPivot : SCCDetector
     {
         readonly object pulseLock = new object();
 
@@ -20,9 +23,9 @@ namespace SCC_Detection.SCCDetectors
         bool[] status;
         Graph g;
 
-        public DCSC(int threadcount)
+        public MultiPivot(int threadcount)
         {
-            this.Name = "DCSC";
+            this.Name = "MultiPivot";
 
             this.threadcount = threadcount;
             this.status = new bool[threadcount];
@@ -35,8 +38,6 @@ namespace SCC_Detection.SCCDetectors
         public override ResultSet Compute(Graph g)
         {
             this.g = g;
-
-            //g.AddShortcuts(7);
 
             taskList.Enqueue(g.Vertices());
 
@@ -53,7 +54,7 @@ namespace SCC_Detection.SCCDetectors
                 threads[copy] = new Thread(new ThreadStart(() => DCSCTask(copy)));
                 threads[copy].Start();
             }
-            
+
             for (int i = 0; i < threadcount; i++)
             {
                 threads[i].Join();
@@ -65,14 +66,13 @@ namespace SCC_Detection.SCCDetectors
         private void DCSCTask(int id)
         {
             HashSet<int> subgraph;
-            
-            while(true)
+
+            while (true)
             {
                 this.status[id] = false;
 
                 while (taskList.TryDequeue(out subgraph))
                 {
-                    //Console.WriteLine("{0} processing subgraph", id);
                     ProcessSubgraph(subgraph);
                 }
 
@@ -98,10 +98,11 @@ namespace SCC_Detection.SCCDetectors
         {
             if (subgraph.Count == 0) return;
 
-            int pivot = g.PivotFromSet(subgraph);
+            //int pivot = g.PivotFromSet(subgraph);
+            HashSet<int> pivots = g.pivotSetMultiPivot(subgraph);
 
-            HashSet<int> forward = g.Forward(pivot, subgraph);
-            HashSet<int> backward = g.Backward(pivot, subgraph);
+            HashSet<int> forward = g.Forward(pivots, subgraph);
+            HashSet<int> backward = g.Backward(pivots, subgraph);
 
             // Need to clone because IntersectWith modifies the existing set 
             // and we need the original forward for th next step
@@ -110,41 +111,29 @@ namespace SCC_Detection.SCCDetectors
 
             // ResultSet has the locks so no need here
             this.result.Add(SCC);
-            
+
             // Calculate the remainder set
             subgraph.ExceptWith(forward);
             subgraph.ExceptWith(backward);
 
             forward.ExceptWith(SCC);
             backward.ExceptWith(SCC);
-            
+
             this.taskList.Enqueue(subgraph);
             this.taskList.Enqueue(forward);
             this.taskList.Enqueue(backward);
 
-            lock(pulseLock)
+            lock (pulseLock)
             {
                 Monitor.PulseAll(pulseLock);
             }
-            
+
             return;
         }
 
         private bool Done()
         {
             return !this.status.Contains(false);
-        }
-
-        private void PrintHashSet(HashSet<int> set)
-        {
-            string s = "";
-
-            foreach (int i in set)
-            {
-                s += i + " ";
-            }
-
-            Console.WriteLine(s);
         }
     }
 }

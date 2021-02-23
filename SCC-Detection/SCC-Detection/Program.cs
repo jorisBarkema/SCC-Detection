@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using SCC_Detection.Datastructures;
 using SCC_Detection.Input;
 using SCC_Detection.SCCDetectors;
@@ -65,7 +67,12 @@ namespace SCC_Detection
 
             foreach (SCCDetector detector in detectors)
             {
-                for(int i = 0; i < tests; i++)
+                Console.WriteLine("Warming up " + detector.Name);
+                ResultSet r = detector.Compute(g);
+
+                List<long> durations = new List<long>();
+
+                for (int i = 0; i < tests; i++)
                 {
                     // clean up
                     GC.Collect();
@@ -74,7 +81,7 @@ namespace SCC_Detection
 
                     stopwatch.Start();
 
-                    ResultSet r = detector.Compute(g);
+                    r = detector.Compute(g);
 
                     stopwatch.Stop();
                     
@@ -82,11 +89,16 @@ namespace SCC_Detection
 
                     long elapsedTime = stopwatch.ElapsedMilliseconds;
                     Console.WriteLine(detector.Name + ": " + elapsedTime + "ms");
+                    durations.Add(elapsedTime);
                     stopwatch.Reset();
                 }
+
+                Console.WriteLine();
+                Console.WriteLine("Average duration: " + durations.Average() + "ms");
+                Console.WriteLine();
             }
 
-            Console.WriteLine("\nDone");
+            Console.WriteLine("Done");
             Console.ReadLine();
         }
 
@@ -114,8 +126,10 @@ namespace SCC_Detection
                     return new SCCDetector[1] { new DCSC(threads) };
                 case "OBFR":
                     return new SCCDetector[1] { new OBFR(threads) };
+                case "MULTIPIVOT":
+                    return new SCCDetector[1] { new MultiPivot(threads) };
                 case "ALL":
-                    return new SCCDetector[2] { new DCSC(threads), new OBFR(threads) };
+                    return new SCCDetector[3] { new DCSC(threads), new OBFR(threads), new MultiPivot(threads) };
                 default:
                     throw new Exception("Invalid algorithms input passed");
             }
