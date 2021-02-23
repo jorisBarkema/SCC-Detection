@@ -90,6 +90,48 @@ namespace SCC_Detection.Datastructures
             return new HashSet<int>(reachable);
         }
 
+        private HashSet<int> BFS(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
+        {
+            Queue<int> edge = new Queue<int>(fromSet);
+
+            HashSet<int> reachable = new HashSet<int>(fromSet);
+
+            // Use the convention that a vertex can reach itself always,
+            // Because that makes sense when defining a single vertex as a trivial SCC.
+
+            while (edge.Count > 0)
+            {
+                int current = edge.Dequeue();
+
+                if (totalSet.Contains(current) && !reachable.Contains(current))
+                {
+                    reachable.Add(current);
+                    //edge.Enqueue(current);
+                }
+
+                List<int> neighbours = map[current];
+
+                // Only look at neighbours in set
+                // Because OBFR changes the graph
+                // which changes the neighbours, causing an error
+                // but OBFR only changes the subgraph it is working on,
+                // so if we only look at the neighbours in the subgraph then this is no problem.
+                List<int> neighboursInSet = totalSet.Intersect(neighbours).ToList();
+
+                foreach (int neighbour in neighboursInSet)
+                {
+                    // Look at the totalSet because we also use this for subgraphs
+                    if (!reachable.Contains(neighbour))
+                    {
+                        //reachable.Add(neighbour);
+                        edge.Enqueue(neighbour);
+                    }
+                }
+            }
+
+            return reachable;
+        }
+
         /// <summary>
         /// Transpose the graph: reverse each connection.
         /// </summary>
