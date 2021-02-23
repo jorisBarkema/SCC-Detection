@@ -187,5 +187,22 @@ namespace SCC_Detection_Test
                 }
             }
         }
+
+        [TestMethod]
+        public void concurrencySampleGraphTwoTest()
+        {
+            foreach (SCCDetector detector in this.concurrentDetectors)
+            {
+                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph2.txt");
+                Graph original = new Graph(g.GetMap());
+
+                ResultSet results = detector.Compute(g);
+
+                for (int i = 0; i < results.List.Count; i++)
+                {
+                    Assert.IsTrue(original.IsSCC(results.List[i]));
+                }
+            }
+        }
     }
 }

@@ -114,31 +114,27 @@ namespace SCC_Detection.SCCDetectors
 
         private void ProcessSLice(Slice slice)
         {
-            while(slice.subgraph.Count > 0)
+            int totalCount = slice.subgraph.Count;
+
+            while (slice.subgraph.Count > 0)
             {
+                
                 Slice trimmed = Trim(slice);
 
                 // If it is fully trimmed we are done
                 if (trimmed.subgraph.Count == 0) return;
 
                 HashSet<int> recursiveSubgraph = Backward(trimmed);
-                
+
                 /*
-                 * Since the slice is rooted from the original seed 
-                 * all current seeds together can reach everything that is remaining
-                 * We already need the backward closure of the seeds as well
-                 * If that is not equal than the slice is definitely not an SCC
-
-                 * But this can still go wrong if the seeds are disconnected
-                 * Then together they can reach/be reached by anything, but not by themselves
-                 * However, if one random vertex in the subgraph can reach every seed, then it is an SCC.
-                 * Do the trimmed/resursiveSubgraph check first because these are already computed
-                 * If these match and there is a potential SCC then check if this is indeed the case.
-                 * Needs another computation of a backward closure
+                 * The recursive Subgraph count can only be equal to the total count
+                 * in the first iteration of this while loop, because otherwise there is already a resursive subgraph eliminated.
+                 * 
+                 * So we know that there is only one seed, and its forward closure is the whole slice.
+                 * If the backward closure is also the while slice, then the slice is an SCC.
                 */
-
-                if (trimmed.subgraph.Count == recursiveSubgraph.Count &&
-                    recursiveSubgraph.Count == g.Backward(g.PivotFromSet(recursiveSubgraph), recursiveSubgraph).Count)
+                
+                if (totalCount == recursiveSubgraph.Count)
                 {
                     Result.Add(recursiveSubgraph);
                     return;
