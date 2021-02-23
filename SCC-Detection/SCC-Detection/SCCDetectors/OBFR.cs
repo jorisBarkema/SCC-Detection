@@ -122,7 +122,7 @@ namespace SCC_Detection.SCCDetectors
                 if (trimmed.subgraph.Count == 0) return;
 
                 HashSet<int> recursiveSubgraph = Backward(trimmed);
-
+                
                 /*
                  * Since the slice is rooted from the original seed 
                  * all current seeds together can reach everything that is remaining
