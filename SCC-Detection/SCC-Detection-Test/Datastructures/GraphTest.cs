@@ -121,11 +121,11 @@ namespace SCC_Detection_Test
             HashSet<int> totalSet = new HashSet<int>(graphMap.Keys);
             HashSet<int> withoutThree = new HashSet<int>(new int[] { 0, 1, 2 });
 
-            CollectionAssert.AreEquivalent(new int[] { 0, 1, 2, 3 }.ToList(), Graph.Reachable(new HashSet<int>(new int[] { 0 }), totalSet, graphMap).ToList());
-            CollectionAssert.AreEquivalent(new int[] { 0, 1, 2 }.ToList(), Graph.Reachable(new HashSet<int>(new int[] { 0 }), withoutThree, graphMap).ToList());
+            CollectionAssert.AreEquivalent(new int[] { 0, 1, 2, 3 }.ToList(), g.Reachable(new HashSet<int>(new int[] { 0 }), totalSet, graphMap).ToList());
+            CollectionAssert.AreEquivalent(new int[] { 0, 1, 2 }.ToList(), g.Reachable(new HashSet<int>(new int[] { 0 }), withoutThree, graphMap).ToList());
 
-            CollectionAssert.AreEquivalent(new int[] { 1, 2, 3 }.ToList(), Graph.Reachable(new HashSet<int>(new int[] { 1 }), totalSet, graphMap).ToList());
-            CollectionAssert.AreEquivalent(new int[] { 3 }.ToList(), Graph.Reachable(new HashSet<int>(new int[] { 3 }), totalSet, graphMap).ToList());
+            CollectionAssert.AreEquivalent(new int[] { 1, 2, 3 }.ToList(), g.Reachable(new HashSet<int>(new int[] { 1 }), totalSet, graphMap).ToList());
+            CollectionAssert.AreEquivalent(new int[] { 3 }.ToList(), g.Reachable(new HashSet<int>(new int[] { 3 }), totalSet, graphMap).ToList());
         }
 
         [TestMethod]

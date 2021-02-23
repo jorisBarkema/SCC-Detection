@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace SCC_Detection.Datastructures
 {
@@ -36,15 +38,59 @@ namespace SCC_Detection.Datastructures
                 this.transposedMap = g.GetTransposedMap();
             }
         }
-
+        
         /// <summary>
-        /// Use standard BFS to find the reachable vertices.
+        /// Use parallel BFS to find the reachable vertices.
         /// </summary>
         /// <param name="fromSet">Set from which we start</param>
         /// <param name="totalSet">(Sub)set of the graph we want to include in the reachability search</param>
         /// <param name="map">Mapping from vertex to its neighbours</param>
         /// <returns>HashSet of the reachable vertices</returns>
-        public static HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
+        public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
+        {
+            return ParallelBFS(fromSet, totalSet, map);
+        }
+
+        private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
+        {
+            ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
+            ConcurrentBag<int> reachable = new ConcurrentBag<int>();
+
+            //TODO: maximum number of threads
+            //https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.paralleloptions.maxdegreeofparallelism?redirectedfrom=MSDN&view=net-5.0#System_Threading_Tasks_ParallelOptions_MaxDegreeOfParallelism
+
+            while (edge.Except(reachable).Count() > 0)
+            {
+                Parallel.ForEach(edge, (current) =>
+                {
+                    if (!reachable.Contains(current))
+                    {
+                        reachable.Add(current);
+                    }
+
+                    List<int> neighbours = map[current];
+
+                    // Only look at neighbours in set
+                    // Because OBFR changes the graph
+                    // which changes the neighbours, causing an error in the ForEach
+                    // but OBFR only changes the subgraph it is working on,
+                    // so if we only look at the neighbours in the subgraph then this is no problem.
+                    List<int> neighboursInSet = totalSet.Intersect(neighbours).ToList();
+
+                    Parallel.ForEach(neighboursInSet, (neighbour) =>
+                    {
+                        if (!edge.Contains(neighbour))
+                        {
+                            edge.Add(neighbour);
+                        }
+                    });
+                });
+            }
+
+            return new HashSet<int>(reachable);
+        }
+
+        private HashSet<int> BFS(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
             Queue<int> edge = new Queue<int>(fromSet);
 
@@ -52,7 +98,7 @@ namespace SCC_Detection.Datastructures
 
             // Use the convention that a vertex can reach itself always,
             // Because that makes sense when defining a single vertex as a trivial SCC.
-            
+
             while (edge.Count > 0)
             {
                 int current = edge.Dequeue();
@@ -72,7 +118,7 @@ namespace SCC_Detection.Datastructures
                 // so if we only look at the neighbours in the subgraph then this is no problem.
                 List<int> neighboursInSet = totalSet.Intersect(neighbours).ToList();
 
-                foreach(int neighbour in neighboursInSet)
+                foreach (int neighbour in neighboursInSet)
                 {
                     // Look at the totalSet because we also use this for subgraphs
                     if (!reachable.Contains(neighbour))
