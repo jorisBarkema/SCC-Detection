@@ -51,6 +51,79 @@ namespace SCC_Detection.Datastructures
             return ParallelBFS(fromSet, totalSet, map);
         }
 
+        private HashSet<int> ParallelDigraphReachability(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
+        {
+            // Add the shortcuts
+            int h = 5; // Maximum recursion
+            ParSC(totalSet, h);
+
+            // Then perform parallel BFS
+            return ParallelBFS(fromSet, totalSet, map);
+        }
+
+        private void ParSC(HashSet<int> totalSet, int h)
+        {
+            if (h == 0) return;
+
+            Random rng = new Random();
+
+            int count = totalSet.Count();
+            int current = 0;
+            int size = 1;
+
+            //TODO: bedenken wat deze waarden moeten zijn, misschien als eigenschappen van Graph class opslaan
+            //int Nk = 1;
+            int Nl = 1;
+            //int D = 1;
+
+            // Initialise the values
+            List<int> pivots = Shuffled(totalSet.ToList());
+            Dictionary<int, bool> alive = new Dictionary<int, bool>();
+
+            foreach (int k in totalSet)
+            {
+                alive[k] = true;
+            }
+
+            // Instead of calculating an appropriate k, we will check when we have done half the work and start decreasing then.
+            // Rework if I want to use another epsilon_pi than 1 later.
+            while(current < count)
+            {
+                List<int> currentPivots = pivots.GetRange(current, size);
+                current += size;
+
+                // Random value for d in [1, ..., Nl)
+                int d = rng.Next(Nl - 1) + 1;
+
+                // Ensure that d will always go down as we recurse deeper
+                d += h * Nl;
+
+                foreach(int pivot in currentPivots)
+                {
+                    if (!alive[pivot]) return;
+
+                    //TODO: the actual logic of the algorithm
+                }
+
+                foreach (int pivot in currentPivots)
+                {
+                    if (!alive[pivot]) return;
+
+                    //TODO: the actual logic of the algorithm
+                }
+
+                // Check if we've passed the halfway point and adapt the number of the next pivots accordingly
+                if ((current << 1) <= count)
+                {
+                    size++;
+                } else
+                {
+                    size--;
+                }
+            }
+        }
+
+
         private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
             ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
@@ -266,7 +339,13 @@ namespace SCC_Detection.Datastructures
             }
         }
 
-
+        //TODO: DepthLimitedParallelBFS implementeren
+        /// <summary>
+        /// BFS with a depth limit.
+        /// </summary>
+        /// <param name="pivot"></param>
+        /// <param name="depth"></param>
+        /// <returns></returns>
         public HashSet<int> DepthLimitedBFS(int pivot, int depth)
         {
             // Item1 is the id, Item2 is the distance
