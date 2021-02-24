@@ -20,6 +20,22 @@ namespace SCC_Detection_Test
         }
 
         /// <summary>
+        /// 0 --> 1 --> 2 --> 3 --> 4
+        /// </summary>
+        private void singleLineGraph()
+        {
+            testMap[0] = new List<int>();
+            testMap[1] = new List<int>();
+            testMap[2] = new List<int>();
+            testMap[3] = new List<int>();
+            testMap[4] = new List<int>();
+
+            testMap[0].Add(1);
+            testMap[1].Add(2);
+            testMap[2].Add(3);
+            testMap[3].Add(4);
+        }
+        /// <summary>
         /// 0 --> 1 --> 2 <--> 3 <-- 4
         /// </summary>
         private void singleLoopGraph()
@@ -181,7 +197,7 @@ namespace SCC_Detection_Test
         }
 
         [TestMethod]
-        public void removeConnectionTest()
+        public void RemoveConnectionTest()
         {
             this.singleLoopGraph();
 
@@ -204,7 +220,7 @@ namespace SCC_Detection_Test
         }
 
         [TestMethod]
-        public void removeNodeTest()
+        public void RemoveNodeTest()
         {
             this.singleLoopGraph();
 
@@ -223,7 +239,7 @@ namespace SCC_Detection_Test
         }
 
         [TestMethod]
-        public void immediateSuccessorsTest()
+        public void ImmediateSuccessorsTest()
         {
             this.pyramidGraph();
 
@@ -234,7 +250,7 @@ namespace SCC_Detection_Test
         }
 
         [TestMethod]
-        public void immediatePredecessorsTest()
+        public void ImmediatePredecessorsTest()
         {
             this.pyramidGraph();
 
@@ -246,7 +262,7 @@ namespace SCC_Detection_Test
         }
 
         [TestMethod]
-        public void immediateSuccessorsSubgraphTest()
+        public void ImmediateSuccessorsSubgraphTest()
         {
             this.pyramidGraph();
 
@@ -263,6 +279,47 @@ namespace SCC_Detection_Test
 
             CollectionAssert.AreEquivalent(new int[] { 1, 3 }.ToList(), g.ImmediateSuccessors(seeds).ToList());
             CollectionAssert.AreEquivalent(new int[] { 1 }.ToList(), g.ImmediateSuccessors(seeds, subgraph).ToList());
+        }
+
+        [TestMethod]
+        public void AddConnectionTest()
+        {
+            this.singleLineGraph();
+
+            Graph g = new Graph(testMap);
+
+            Dictionary<int, List<int>> graphMap = g.GetMap();
+
+            CollectionAssert.AreEquivalent(new int[] { 1 }.ToList(), graphMap[0]);
+
+            g.AddConnection(0, 2);
+
+            graphMap = g.GetMap();
+
+            CollectionAssert.AreEquivalent(new int[] { 1, 2 }.ToList(), graphMap[0]);
+
+            g.AddConnection(0, 3);
+
+            graphMap = g.GetMap();
+
+            CollectionAssert.AreEquivalent(new int[] { 1, 2, 3 }.ToList(), graphMap[0]);
+        }
+
+        [TestMethod]
+        public void DepthLimitedBFSTest()
+        {
+            // 0 --> 1 --> 2 <--> 3 <-- 4
+            this.singleLoopGraph();
+
+            Graph g = new Graph(testMap);
+
+            HashSet<int> reachable = g.DepthLimitedBFS(0, 2);
+
+            CollectionAssert.AreEquivalent(new int[] { 0, 1, 2 }.ToList(), reachable.ToList());
+
+            reachable = g.DepthLimitedBFS(0, 10);
+
+            CollectionAssert.AreEquivalent(new int[] { 0, 1, 2, 3 }.ToList(), reachable.ToList());
         }
     }
 }
