@@ -14,12 +14,16 @@ namespace SCC_Detection.Datastructures
 
         readonly object graphLock = new object();
 
+        Random rng;
+
         //private int nodeCount = 0;
         //private Dictionary<int, int> idMap = new Dictionary<int, int>();
         //private List<int> reverseIdMap = new List<int>();
 
         public Graph(Dictionary<int, List<int>> map)
         {
+            this.rng = new Random();
+
             Graph.CheckMap(map);
             this.map = this.InitializeMap(map);
             this.transposedMap = Graph.Transpose(this.map);
@@ -27,6 +31,8 @@ namespace SCC_Detection.Datastructures
 
         public Graph(Graph g, bool transposed = false)
         {
+            this.rng = new Random();
+
             if (transposed)
             {
                 this.map = g.GetTransposedMap();
@@ -64,9 +70,7 @@ namespace SCC_Detection.Datastructures
         private void ParSC(HashSet<int> totalSet, int h)
         {
             if (h == 0) return;
-
-            Random rng = new Random();
-
+            
             int count = totalSet.Count();
             int current = 0;
             int size = 1;
@@ -74,7 +78,7 @@ namespace SCC_Detection.Datastructures
             //TODO: bedenken wat deze waarden moeten zijn, misschien als eigenschappen van Graph class opslaan
             //int Nk = 1;
             int Nl = 1;
-            //int D = 1;
+            int D = 1;
 
             // Initialise the values
             List<int> pivots = Shuffled(totalSet.ToList());
@@ -96,20 +100,41 @@ namespace SCC_Detection.Datastructures
                 int d = rng.Next(Nl - 1) + 1;
 
                 // Ensure that d will always go down as we recurse deeper
+                // This is not yet exactly the same as the apaper describes,
+                // but I don't understand the reasoning behind the complexity of the paper's version
                 d += h * Nl;
 
-                foreach(int pivot in currentPivots)
+                // We will not keep track of the shortcuts to add in a list or dictinoary
+                // but add them straight away.
+                // Since in the algorithm S is only used in unions not intersections
+                // something in S is never removed from it, so this has no effect on the number of shortcuts added.
+
+                Dictionary<int, HashSet<int>> backwardCores = new Dictionary<int, HashSet<int>>();
+                Dictionary<int, HashSet<int>> forwardCores = new Dictionary<int, HashSet<int>>();
+
+                Dictionary<int, HashSet<int>> backwardFringes = new Dictionary<int, HashSet<int>>();
+                Dictionary<int, HashSet<int>> forwardFringes = new Dictionary<int, HashSet<int>>();
+
+                foreach (int pivot in currentPivots)
                 {
                     if (!alive[pivot]) return;
 
-                    //TODO: the actual logic of the algorithm
+                    backwardCores[pivot] = this.DepthLimitedBFS(pivot, d * D, transposedMap);
+                    forwardCores[pivot] = this.DepthLimitedBFS(pivot, d * D);
+
+                    backwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap).Except(backwardCores[pivot]));
+                    forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D).Except(forwardCores[pivot]));
+                    
+                    //TODO: add the shortcuts
+                    //TODO: add tags (?)
                 }
 
                 foreach (int pivot in currentPivots)
                 {
                     if (!alive[pivot]) return;
 
-                    //TODO: the actual logic of the algorithm
+                    //TODO: mark as dead and something with the tags
+                    //TODO: recursive calls
                 }
 
                 // Check if we've passed the halfway point and adapt the number of the next pivots accordingly
@@ -274,8 +299,6 @@ namespace SCC_Detection.Datastructures
         /// <returns>Shuffled list</returns>
         private List<T> Shuffled<T>(List<T> list)
         {
-            Random rng = new Random();
-
             int n = list.Count;
             while (n > 1)
             {
@@ -339,6 +362,10 @@ namespace SCC_Detection.Datastructures
             }
         }
 
+        public HashSet<int> DepthLimitedBFS(int pivot, int depth)
+        {
+            return DepthLimitedBFS(pivot, depth, this.map);
+        }
         //TODO: DepthLimitedParallelBFS implementeren
         /// <summary>
         /// BFS with a depth limit.
@@ -346,7 +373,7 @@ namespace SCC_Detection.Datastructures
         /// <param name="pivot"></param>
         /// <param name="depth"></param>
         /// <returns></returns>
-        public HashSet<int> DepthLimitedBFS(int pivot, int depth)
+        public HashSet<int> DepthLimitedBFS(int pivot, int depth, Dictionary<int, List<int>> map)
         {
             // Item1 is the id, Item2 is the distance
             Queue<Tuple<int, int>> edge = new Queue<Tuple<int, int>>();
