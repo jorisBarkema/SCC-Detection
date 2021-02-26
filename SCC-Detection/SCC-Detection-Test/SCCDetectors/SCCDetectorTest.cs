@@ -68,9 +68,10 @@ namespace SCC_Detection_Test
                 Graph g = new Graph(testMap);
                 ResultSet results = detector.Compute(g);
 
+                Assert.AreEqual(3, results.List.Count);
+
                 for (int i = 0; i < 3; i++)
                 {
-                    Assert.AreEqual(3, results.List.Count);
                     Assert.IsTrue(results.Contains(i));
                 }
             }

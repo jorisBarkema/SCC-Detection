@@ -54,30 +54,41 @@ namespace SCC_Detection.Datastructures
         /// <returns>HashSet of the reachable vertices</returns>
         public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
-            return ParallelBFS(fromSet, totalSet, map);
+            return ParallelDigraphReachability(fromSet, totalSet, map);
         }
 
         private HashSet<int> ParallelDigraphReachability(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
             // Add the shortcuts
-            int h = 5; // Maximum recursion
-            ParSC(totalSet, h);
+            int h = 3; // Maximum recursion
+            Dictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
+
+            Parallel.ForEach(shortcuts, (shortcut) =>
+            {
+                // Also parallelise this? Don't think it's worth it because this is already going on in parallel
+                foreach(int to in shortcut.Value)
+                {
+                    AddConnection(shortcut.Key, to);
+                }
+            });
 
             // Then perform parallel BFS
             return ParallelBFS(fromSet, totalSet, map);
         }
 
-        private void ParSC(HashSet<int> totalSet, int h)
+        private Dictionary<int, HashSet<int>> ParSC(HashSet<int> totalSet, int h)
         {
-            if (h == 0) return;
-            
+            if (h == 0) return new Dictionary<int, HashSet<int>>();
+
+            Dictionary<int, HashSet<int>> S = new Dictionary<int, HashSet<int>>();
+
             int count = totalSet.Count();
             int current = 0;
             int size = 1;
 
             //TODO: bedenken wat deze waarden moeten zijn, misschien als eigenschappen van Graph class opslaan
             //int Nk = 1;
-            int Nl = 1;
+            int Nl = 4;
             int D = 1;
 
             // Initialise the values
@@ -90,11 +101,10 @@ namespace SCC_Detection.Datastructures
             }
 
             // Instead of calculating an appropriate k, we will check when we have done half the work and start decreasing then.
-            // Rework if I want to use another epsilon_pi than 1 later.
+            // Rework if I want to use an epsilon_pi other than 1 later.
             while(current < count)
             {
-                List<int> currentPivots = pivots.GetRange(current, size);
-                current += size;
+                List<int> currentPivots = pivots.GetRange(current, Math.Min(size, pivots.Count - current));
 
                 // Random value for d in [1, ..., Nl)
                 int d = rng.Next(Nl - 1) + 1;
@@ -104,11 +114,6 @@ namespace SCC_Detection.Datastructures
                 // but I don't understand the reasoning behind the complexity of the paper's version
                 d += h * Nl;
 
-                // We will not keep track of the shortcuts to add in a list or dictinoary
-                // but add them straight away.
-                // Since in the algorithm S is only used in unions not intersections
-                // something in S is never removed from it, so this has no effect on the number of shortcuts added.
-
                 Dictionary<int, HashSet<int>> backwardCores = new Dictionary<int, HashSet<int>>();
                 Dictionary<int, HashSet<int>> forwardCores = new Dictionary<int, HashSet<int>>();
 
@@ -117,7 +122,7 @@ namespace SCC_Detection.Datastructures
 
                 foreach (int pivot in currentPivots)
                 {
-                    if (!alive[pivot]) return;
+                    if (!alive[pivot]) continue;
 
                     backwardCores[pivot] = this.DepthLimitedBFS(pivot, d * D, transposedMap);
                     forwardCores[pivot] = this.DepthLimitedBFS(pivot, d * D);
@@ -125,27 +130,85 @@ namespace SCC_Detection.Datastructures
                     backwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap).Except(backwardCores[pivot]));
                     forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D).Except(forwardCores[pivot]));
                     
-                    //TODO: add the shortcuts
+                    // Hoped to be able to just add connections straight away and not keep track of them,
+                    // but then there are issues where the graph is changed during other threads' BFS, causing errors.
+                    // These can be fixed but require locks, throwing away the parallelism./
+                    // Instead add the edges in parallel after the ParSC is completed.
+                    foreach (int id in backwardCores[pivot].Union(backwardFringes[pivot]))
+                    {
+                        if (!S.ContainsKey(id))
+                        {
+                            S[id] = new HashSet<int>();
+                        }
+                        S[id].Add(pivot);
+                        
+                        //AddConnection(id, pivot);
+                    }
+
+                    foreach (int id in forwardCores[pivot].Union(forwardFringes[pivot]))
+                    {
+                        if (!S.ContainsKey(pivot))
+                        {
+                            S[pivot] = new HashSet<int>();
+                        }
+                        S[pivot].Add(id);
+
+                        //AddConnection(pivot, id);
+                    }
+                    
+
                     //TODO: add tags (?)
+                    // I think only needed when parallelising the algorithm.
                 }
 
                 foreach (int pivot in currentPivots)
                 {
-                    if (!alive[pivot]) return;
+                    if (!alive[pivot]) continue;
 
-                    //TODO: mark as dead and something with the tags
-                    //TODO: recursive calls
+                    //TODO: something with the tags
+
+                    HashSet<int> VB = new HashSet<int>(forwardCores[pivot].Intersect(backwardCores[pivot]));
+                    HashSet<int> VS = new HashSet<int>(VB.Except(forwardCores[pivot]));
+                    HashSet<int> VP = new HashSet<int>(VB.Except(backwardCores[pivot]));
+
+                    // This needs to be done in parallel
+                    Dictionary<int, HashSet<int>> forwardS = ParSC(new HashSet<int>(VS.Union(forwardFringes[pivot])), h - 1);
+                    Dictionary<int, HashSet<int>> backwardS = ParSC(new HashSet<int>(VP.Union(backwardFringes[pivot])), h - 1);
+
+                    Parallel.ForEach(forwardS, (pair) =>
+                    {
+                        S[pair.Key].UnionWith(pair.Value);
+                    });
+
+                    Parallel.ForEach(backwardS, (pair) =>
+                    {
+                        S[pair.Key].UnionWith(pair.Value);
+                    });
+                }
+
+                foreach (int pivot in currentPivots)
+                {
+                    if (!alive[pivot]) continue;
+
+                    foreach (int id in forwardCores[pivot].Union(backwardCores[pivot]))
+                    {
+                        alive[id] = false;
+                    }
                 }
 
                 // Check if we've passed the halfway point and adapt the number of the next pivots accordingly
-                if ((current << 1) <= count)
+                if ((current * 2) <= count)
                 {
                     size++;
                 } else
                 {
                     size--;
                 }
+
+                current += size;
             }
+
+            return S;
         }
 
 
@@ -712,6 +775,8 @@ namespace SCC_Detection.Datastructures
 
         public void AddConnection(int from, int to)
         {
+            if (from == to) return;
+
             if (!this.map[from].Contains(to))
             {
                 this.map[from].Add(to);
