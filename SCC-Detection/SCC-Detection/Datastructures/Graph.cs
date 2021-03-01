@@ -54,8 +54,8 @@ namespace SCC_Detection.Datastructures
         /// <returns>HashSet of the reachable vertices</returns>
         public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
-            //return ParallelBFS(fromSet, totalSet, map);
-            return ParallelDigraphReachability(fromSet, totalSet, map);
+            return ParallelBFS(fromSet, totalSet, map);
+            //return ParallelDigraphReachability(fromSet, totalSet, map);
         }
 
         private HashSet<int> ParallelDigraphReachability(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
@@ -215,8 +215,17 @@ namespace SCC_Detection.Datastructures
 
         private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
-            ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
-            ConcurrentBag<int> reachable = new ConcurrentBag<int>();
+            ConcurrentDictionary<int, byte> edge = new ConcurrentDictionary<int, byte>();
+
+            foreach(int id in fromSet)
+            {
+                edge[id] = 0;
+            }
+
+            ConcurrentDictionary<int, byte> reachable = new ConcurrentDictionary<int, byte>();
+
+            //ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
+            //ConcurrentBag<int> reachable = new ConcurrentBag<int>();
 
             //TODO: maximum number of threads
             //https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.paralleloptions.maxdegreeofparallelism?redirectedfrom=MSDN&view=net-5.0#System_Threading_Tasks_ParallelOptions_MaxDegreeOfParallelism
@@ -225,12 +234,13 @@ namespace SCC_Detection.Datastructures
             {
                 Parallel.ForEach(edge, (current) =>
                 {
-                    if (!reachable.Contains(current))
+                    if (!reachable.Keys.Contains(current.Key))
                     {
-                        reachable.Add(current);
+                        //reachable.Add(current);
+                        reachable[current.Key] = 0;
                     }
 
-                    List<int> neighbours = map[current];
+                    List<int> neighbours = map[current.Key];
 
                     // Only look at neighbours in set
                     // Because OBFR changes the graph
@@ -239,17 +249,14 @@ namespace SCC_Detection.Datastructures
                     // so if we only look at the neighbours in the subgraph then this is no problem.
                     List<int> neighboursInSet = totalSet.Intersect(neighbours).ToList();
 
-                    Parallel.ForEach(neighboursInSet, (neighbour) =>
+                    foreach(int neighbour in neighboursInSet)
                     {
-                        if (!edge.Contains(neighbour))
-                        {
-                            edge.Add(neighbour);
-                        }
-                    });
+                        edge[neighbour] = 0;
+                    }
                 });
             }
 
-            return new HashSet<int>(reachable);
+            return new HashSet<int>(reachable.Keys);
         }
 
         private HashSet<int> BFS(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
