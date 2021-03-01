@@ -16,6 +16,8 @@ namespace SCC_Detection.Datastructures
 
         Random rng;
 
+        bool shortcutsAdded = false;
+
         //private int nodeCount = 0;
         //private Dictionary<int, int> idMap = new Dictionary<int, int>();
         //private List<int> reverseIdMap = new List<int>();
@@ -54,24 +56,29 @@ namespace SCC_Detection.Datastructures
         /// <returns>HashSet of the reachable vertices</returns>
         public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
-            return ParallelBFS(fromSet, totalSet, map);
-            //return ParallelDigraphReachability(fromSet, totalSet, map);
+            //return ParallelBFS(fromSet, totalSet, map);
+            return ParallelDigraphReachability(fromSet, totalSet, map);
         }
 
         private HashSet<int> ParallelDigraphReachability(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
-            // Add the shortcuts
-            int h = 3; // Maximum recursion
-            Dictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
-
-            Parallel.ForEach(shortcuts, (shortcut) =>
+            if (!this.shortcutsAdded)
             {
-                // Also parallelise this? Don't think it's worth it because this is already going on in parallel
-                foreach(int to in shortcut.Value)
+                // Add the shortcuts
+                int h = 3; // Maximum recursion
+                Dictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
+
+                Parallel.ForEach(shortcuts, (shortcut) =>
                 {
-                    AddConnection(shortcut.Key, to);
-                }
-            });
+                    // Also parallelise this? Don't think it's worth it because this is already going on in parallel
+                    foreach (int to in shortcut.Value)
+                    {
+                        AddConnection(shortcut.Key, to);
+                    }
+                });
+
+                this.shortcutsAdded = true;
+            }
 
             // Then perform parallel BFS
             return ParallelBFS(fromSet, totalSet, map);
@@ -466,18 +473,21 @@ namespace SCC_Detection.Datastructures
                     //edge.Enqueue(current);
                 }
 
-                // Make it a new list to prevent it being changed during the foreach
-                List<int> neighbours = new List<int>(map[current.Item1]);
-                
-                foreach (int neighbour in neighbours)
+                lock (graphLock)
                 {
-                    // Look at the totalSet because we also use this for subgraphs
-                    if (!reachable.Keys.Contains(neighbour))
+                    // Make it a new list to prevent it being changed during the foreach
+                    List<int> neighbours = new List<int>(map[current.Item1]);
+
+                    foreach (int neighbour in neighbours)
                     {
-                        //reachable.Add(neighbour);
-                        if (current.Item2 + 1 <= depth)
+                        // Look at the totalSet because we also use this for subgraphs
+                        if (!reachable.Keys.Contains(neighbour))
                         {
-                            edge.Enqueue(new Tuple<int, int>(neighbour, current.Item2 + 1));
+                            //reachable.Add(neighbour);
+                            if (current.Item2 + 1 <= depth)
+                            {
+                                edge.Enqueue(new Tuple<int, int>(neighbour, current.Item2 + 1));
+                            }
                         }
                     }
                 }
