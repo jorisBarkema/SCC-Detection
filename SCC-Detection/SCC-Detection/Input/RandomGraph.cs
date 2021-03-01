@@ -8,7 +8,7 @@ namespace SCC_Detection.Input
 {
     public class RandomGraph
     {
-        public static Graph Generate(int n, double p)
+        public static Graph Generate(int n, double p, int threads)
         {
             Dictionary<int, List<int>> map = new Dictionary<int, List<int>>();
 
@@ -30,7 +30,7 @@ namespace SCC_Detection.Input
                 map[id] = neighbours;
             }
 
-            return new Graph(map);
+            return new Graph(map, threads);
         }
     }
 }

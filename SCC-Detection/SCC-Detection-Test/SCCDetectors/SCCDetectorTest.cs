@@ -160,7 +160,7 @@ namespace SCC_Detection_Test
 
             foreach(SCCDetector detector in this.concurrentDetectors)
             {
-                Graph g = RandomGraph.Generate(size, 0.05);
+                Graph g = RandomGraph.Generate(size, 0.05, 4);
                 Graph original = new Graph(g.GetMap());
 
                 ResultSet results = detector.Compute(g);
@@ -177,7 +177,7 @@ namespace SCC_Detection_Test
         {
             foreach (SCCDetector detector in this.concurrentDetectors)
             {
-                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph.txt");
+                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph.txt", 4);
                 Graph original = new Graph(g.GetMap());
 
                 ResultSet results = detector.Compute(g);
@@ -194,7 +194,7 @@ namespace SCC_Detection_Test
         {
             foreach (SCCDetector detector in this.concurrentDetectors)
             {
-                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph2.txt");
+                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph2.txt", 4);
                 Graph original = new Graph(g.GetMap());
 
                 ResultSet results = detector.Compute(g);

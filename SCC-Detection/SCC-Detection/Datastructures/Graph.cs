@@ -16,24 +16,29 @@ namespace SCC_Detection.Datastructures
 
         Random rng;
 
-        bool shortcutsAdded = false;
+        private ParallelOptions parallelOptions;
+
+        private bool shortcutsAdded = false;
 
         //private int nodeCount = 0;
         //private Dictionary<int, int> idMap = new Dictionary<int, int>();
         //private List<int> reverseIdMap = new List<int>();
 
-        public Graph(Dictionary<int, List<int>> map)
+        public Graph(Dictionary<int, List<int>> map, int threads = 1)
         {
             this.rng = new Random();
 
             Graph.CheckMap(map);
             this.map = this.InitializeMap(map);
             this.transposedMap = Graph.Transpose(this.map);
+
+            this.parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = threads };
         }
 
-        public Graph(Graph g, bool transposed = false)
+        public Graph(Graph g, bool transposed = false, int threads = 1)
         {
             this.rng = new Random();
+            this.parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = threads };
 
             if (transposed)
             {
@@ -68,7 +73,7 @@ namespace SCC_Detection.Datastructures
                 int h = 1; // Maximum recursion
                 Dictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
 
-                Parallel.ForEach(shortcuts, (shortcut) =>
+                Parallel.ForEach(shortcuts, parallelOptions, (shortcut) =>
                 {
                     // Also parallelise this? Don't think it's worth it because this is already going on in parallel
                     foreach (int to in shortcut.Value)
@@ -171,7 +176,7 @@ namespace SCC_Detection.Datastructures
                     // I think only needed when parallelising the algorithm.
                 }
 
-                Parallel.ForEach(currentPivots, (pivot) =>
+                Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
                 {
                     if (alive[pivot])
                     {
@@ -196,33 +201,6 @@ namespace SCC_Detection.Datastructures
                         }
                     }
                 });
-
-                /*
-                foreach (int pivot in currentPivots)
-                {
-                    if (!alive[pivot]) continue;
-
-                    //TODO: something with the tags
-
-                    HashSet<int> VB = new HashSet<int>(forwardCores[pivot].Intersect(backwardCores[pivot]));
-                    HashSet<int> VS = new HashSet<int>(VB.Except(forwardCores[pivot]));
-                    HashSet<int> VP = new HashSet<int>(VB.Except(backwardCores[pivot]));
-
-                    // This needs to be done in parallel
-                    Dictionary<int, HashSet<int>> forwardS = ParSC(new HashSet<int>(VS.Union(forwardFringes[pivot])), h - 1);
-                    Dictionary<int, HashSet<int>> backwardS = ParSC(new HashSet<int>(VP.Union(backwardFringes[pivot])), h - 1);
-
-                    Parallel.ForEach(forwardS, (pair) =>
-                    {
-                        S[pair.Key].UnionWith(pair.Value);
-                    });
-
-                    Parallel.ForEach(backwardS, (pair) =>
-                    {
-                        S[pair.Key].UnionWith(pair.Value);
-                    });
-                }
-                */
 
                 foreach (int pivot in currentPivots)
                 {
@@ -269,7 +247,7 @@ namespace SCC_Detection.Datastructures
             {
                 while (edge.Except(reachable).Count() > 0)
                 {
-                    Parallel.ForEach(edge, (current) =>
+                    Parallel.ForEach(edge, parallelOptions, (current) =>
                     {
                         if (!reachable.Keys.Contains(current.Key))
                         {
@@ -547,7 +525,7 @@ namespace SCC_Detection.Datastructures
             {
                 while (edge.Except(reachable).Count() > 0)
                 {
-                    Parallel.ForEach(edge, (current) =>
+                    Parallel.ForEach(edge, parallelOptions, (current) =>
                     {
                         if (!reachable.Keys.Contains(current.Key))
                         {

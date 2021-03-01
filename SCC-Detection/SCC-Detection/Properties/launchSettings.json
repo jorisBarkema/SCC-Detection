@@ -2,7 +2,7 @@
   "profiles": {
     "SCC-Detection": {
       "commandName": "Project",
-      "commandLineArgs": "10 8 ALL file D:\\Documents\\computing_science\\master_thesis\\graphs\\Wiki-Vote.txt SNAP"
+      "commandLineArgs": "5 8 ALL file D:\\Documents\\computing_science\\master_thesis\\graphs\\Wiki-Vote.txt SNAP"
     }
   }
 }
