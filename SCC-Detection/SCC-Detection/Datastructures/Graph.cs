@@ -65,7 +65,7 @@ namespace SCC_Detection.Datastructures
             if (!this.shortcutsAdded)
             {
                 // Add the shortcuts
-                int h = 3; // Maximum recursion
+                int h = 1; // Maximum recursion
                 Dictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
 
                 Parallel.ForEach(shortcuts, (shortcut) =>
@@ -134,11 +134,11 @@ namespace SCC_Detection.Datastructures
                 {
                     if (!alive[pivot]) continue;
 
-                    backwardCores[pivot] = this.DepthLimitedBFS(pivot, d * D, transposedMap);
-                    forwardCores[pivot] = this.DepthLimitedBFS(pivot, d * D);
+                    backwardCores[pivot] = this.DepthLimitedParallelBFS(pivot, d * D, transposedMap);
+                    forwardCores[pivot] = this.DepthLimitedParallelBFS(pivot, d * D);
 
-                    backwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap).Except(backwardCores[pivot]));
-                    forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D).Except(forwardCores[pivot]));
+                    backwardFringes[pivot] = new HashSet<int>(this.DepthLimitedParallelBFS(pivot, (d + 1) * D, transposedMap).Except(backwardCores[pivot]));
+                    forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedParallelBFS(pivot, (d + 1) * D).Except(forwardCores[pivot]));
                     
                     // Hoped to be able to just add connections straight away and not keep track of them,
                     // but then there are issues where the graph is changed during other threads' BFS, causing errors.
@@ -222,14 +222,14 @@ namespace SCC_Detection.Datastructures
 
         private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
-            ConcurrentDictionary<int, byte> edge = new ConcurrentDictionary<int, byte>();
+            ConcurrentDictionary<int, bool> edge = new ConcurrentDictionary<int, bool>();
 
             foreach(int id in fromSet)
             {
-                edge[id] = 0;
+                edge[id] = true;
             }
 
-            ConcurrentDictionary<int, byte> reachable = new ConcurrentDictionary<int, byte>();
+            ConcurrentDictionary<int, bool> reachable = new ConcurrentDictionary<int, bool>();
 
             //ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
             //ConcurrentBag<int> reachable = new ConcurrentBag<int>();
@@ -237,30 +237,33 @@ namespace SCC_Detection.Datastructures
             //TODO: maximum number of threads
             //https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.paralleloptions.maxdegreeofparallelism?redirectedfrom=MSDN&view=net-5.0#System_Threading_Tasks_ParallelOptions_MaxDegreeOfParallelism
 
-            while (edge.Except(reachable).Count() > 0)
+            lock (graphLock)
             {
-                Parallel.ForEach(edge, (current) =>
+                while (edge.Except(reachable).Count() > 0)
                 {
-                    if (!reachable.Keys.Contains(current.Key))
+                    Parallel.ForEach(edge, (current) =>
                     {
+                        if (!reachable.Keys.Contains(current.Key))
+                        {
                         //reachable.Add(current);
-                        reachable[current.Key] = 0;
-                    }
+                        reachable[current.Key] = true;
+                        }
 
-                    List<int> neighbours = map[current.Key];
+                    //List<int> neighbours = map[current.Key];
 
                     // Only look at neighbours in set
                     // Because OBFR changes the graph
                     // which changes the neighbours, causing an error in the ForEach
                     // but OBFR only changes the subgraph it is working on,
                     // so if we only look at the neighbours in the subgraph then this is no problem.
-                    List<int> neighboursInSet = totalSet.Intersect(neighbours).ToList();
+                    List<int> neighboursInSet = totalSet.Intersect(map[current.Key]).ToList();
 
-                    foreach(int neighbour in neighboursInSet)
-                    {
-                        edge[neighbour] = 0;
-                    }
-                });
+                        foreach (int neighbour in neighboursInSet)
+                        {
+                            edge[neighbour] = true;
+                        }
+                    });
+                }
             }
 
             return new HashSet<int>(reachable.Keys);
@@ -490,6 +493,49 @@ namespace SCC_Detection.Datastructures
                             }
                         }
                     }
+                }
+            }
+
+            return new HashSet<int>(reachable.Keys);
+        }
+
+        public HashSet<int> DepthLimitedParallelBFS(int pivot, int depth)
+        {
+            return DepthLimitedParallelBFS(pivot, depth, this.map);
+        }
+
+        public HashSet<int> DepthLimitedParallelBFS(int pivot, int depth, Dictionary<int, List<int>> map)
+        {
+            ConcurrentDictionary<int, int> edge = new ConcurrentDictionary<int, int>();
+            ConcurrentDictionary<int, int> reachable = new ConcurrentDictionary<int, int>();
+
+            edge[pivot] = 0;
+            reachable[pivot] = 0;
+            
+            //TODO: maximum number of threads
+            //https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.paralleloptions.maxdegreeofparallelism?redirectedfrom=MSDN&view=net-5.0#System_Threading_Tasks_ParallelOptions_MaxDegreeOfParallelism
+
+            lock (graphLock)
+            {
+                while (edge.Except(reachable).Count() > 0)
+                {
+                    Parallel.ForEach(edge, (current) =>
+                    {
+                        if (!reachable.Keys.Contains(current.Key))
+                        {
+                            reachable[current.Key] = current.Value;
+                        }
+
+                        if (current.Value < depth)
+                        {
+                            List<int> neighboursInSet = map[current.Key];
+
+                            foreach (int neighbour in neighboursInSet)
+                            {
+                                edge[neighbour] = current.Value + 1;
+                            }
+                        }
+                    });
                 }
             }
 

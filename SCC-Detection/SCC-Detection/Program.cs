@@ -129,7 +129,7 @@ namespace SCC_Detection
                 case "MULTIPIVOT":
                     return new SCCDetector[1] { new MultiPivot(threads) };
                 case "ALL":
-                    return new SCCDetector[3] { new DCSC(threads), new OBFR(threads), new MultiPivot(threads) };
+                    return new SCCDetector[3] { new OBFR(threads), new DCSC(threads), new MultiPivot(threads) };
                 default:
                     throw new Exception("Invalid algorithms input passed");
             }
