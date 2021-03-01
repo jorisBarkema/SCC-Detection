@@ -54,6 +54,7 @@ namespace SCC_Detection.Datastructures
         /// <returns>HashSet of the reachable vertices</returns>
         public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
+            //return ParallelBFS(fromSet, totalSet, map);
             return ParallelDigraphReachability(fromSet, totalSet, map);
         }
 
@@ -102,9 +103,11 @@ namespace SCC_Detection.Datastructures
 
             // Instead of calculating an appropriate k, we will check when we have done half the work and start decreasing then.
             // Rework if I want to use an epsilon_pi other than 1 later.
-            while(current < count)
+            while(current < pivots.Count - 1)
             {
                 List<int> currentPivots = pivots.GetRange(current, Math.Min(size, pivots.Count - current));
+
+                current += size;
 
                 // Random value for d in [1, ..., Nl)
                 int d = rng.Next(Nl - 1) + 1;
@@ -197,15 +200,13 @@ namespace SCC_Detection.Datastructures
                 }
 
                 // Check if we've passed the halfway point and adapt the number of the next pivots accordingly
-                if ((current * 2) <= count)
+                if (((current - size) * 2) <= count)
                 {
                     size++;
                 } else
                 {
                     size--;
                 }
-
-                current += size;
             }
 
             return S;
@@ -429,6 +430,7 @@ namespace SCC_Detection.Datastructures
         {
             return DepthLimitedBFS(pivot, depth, this.map);
         }
+
         //TODO: DepthLimitedParallelBFS implementeren
         /// <summary>
         /// BFS with a depth limit.
@@ -457,7 +459,8 @@ namespace SCC_Detection.Datastructures
                     //edge.Enqueue(current);
                 }
 
-                List<int> neighbours = map[current.Item1];
+                // Make it a new list to prevent it being changed during the foreach
+                List<int> neighbours = new List<int>(map[current.Item1]);
                 
                 foreach (int neighbour in neighbours)
                 {
@@ -775,22 +778,30 @@ namespace SCC_Detection.Datastructures
 
         public void AddConnection(int from, int to)
         {
-            if (from == to) return;
-
-            if (!this.map[from].Contains(to))
+            lock(this.graphLock)
             {
-                this.map[from].Add(to);
-            }
+                if (from == to || !this.map.ContainsKey(from) || !this.transposedMap.ContainsKey(to)) return;
 
-            if (!this.transposedMap[to].Contains(from))
-            {
-                this.transposedMap[to].Add(from);
+                if (!this.map[from].Contains(to))
+                {
+                    this.map[from].Add(to);
+                }
+
+                if (!this.transposedMap[to].Contains(from))
+                {
+                    this.transposedMap[to].Add(from);
+                }
             }
+            
         }
         public void RemoveConnection(int from, int to)
         {
-            this.map[from].Remove(to);
-            this.transposedMap[to].Remove(from);
+            lock(this.graphLock)
+            {
+                this.map[from].Remove(to);
+                this.transposedMap[to].Remove(from);
+            }
+            
         }
         
         public void RemoveNode(int id)
