@@ -120,7 +120,7 @@ namespace SCC_Detection.Datastructures
                 int d = rng.Next(Nl - 1) + 1;
 
                 // Ensure that d will always go down as we recurse deeper
-                // This is not yet exactly the same as the apaper describes,
+                // This is not yet exactly the same as the paper describes,
                 // but I don't understand the reasoning behind the complexity of the paper's version
                 d += h * Nl;
 
@@ -171,6 +171,33 @@ namespace SCC_Detection.Datastructures
                     // I think only needed when parallelising the algorithm.
                 }
 
+                Parallel.ForEach(currentPivots, (pivot) =>
+                {
+                    if (alive[pivot])
+                    {
+                        //TODO: something with the tags
+
+                        HashSet<int> VB = new HashSet<int>(forwardCores[pivot].Intersect(backwardCores[pivot]));
+                        HashSet<int> VS = new HashSet<int>(VB.Except(forwardCores[pivot]));
+                        HashSet<int> VP = new HashSet<int>(VB.Except(backwardCores[pivot]));
+
+                        // This also in parallel? I think I have too much or at least enough parallelism already
+                        Dictionary<int, HashSet<int>> forwardS = ParSC(new HashSet<int>(VS.Union(forwardFringes[pivot])), h - 1);
+                        Dictionary<int, HashSet<int>> backwardS = ParSC(new HashSet<int>(VP.Union(backwardFringes[pivot])), h - 1);
+
+                        foreach(KeyValuePair<int, HashSet<int>> pair in forwardS)
+                        {
+                            S[pair.Key].UnionWith(pair.Value);
+                        }
+
+                        foreach (KeyValuePair<int, HashSet<int>> pair in backwardS)
+                        {
+                            S[pair.Key].UnionWith(pair.Value);
+                        }
+                    }
+                });
+
+                /*
                 foreach (int pivot in currentPivots)
                 {
                     if (!alive[pivot]) continue;
@@ -195,6 +222,7 @@ namespace SCC_Detection.Datastructures
                         S[pair.Key].UnionWith(pair.Value);
                     });
                 }
+                */
 
                 foreach (int pivot in currentPivots)
                 {
