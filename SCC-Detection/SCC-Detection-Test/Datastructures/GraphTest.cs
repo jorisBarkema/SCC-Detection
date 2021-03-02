@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 using SCC_Detection.Datastructures;
+using System.Collections.Concurrent;
 
 namespace SCC_Detection_Test
 {

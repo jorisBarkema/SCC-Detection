@@ -129,16 +129,26 @@ namespace SCC_Detection.Datastructures
                 ConcurrentDictionary<int, HashSet<int>> backwardFringes = new ConcurrentDictionary<int, HashSet<int>>();
                 ConcurrentDictionary<int, HashSet<int>> forwardFringes = new ConcurrentDictionary<int, HashSet<int>>();
 
+                ConcurrentDictionary<int, List<int>> tagDictionary = new ConcurrentDictionary<int, List<int>>();
+
                 // TODO: dit kan efficienter met de tags zoals uitgelegd in de paper
                 Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
                 {
                     if (!alive[pivot]) return;
 
-                    backwardCores[pivot] = this.DepthLimitedParallelBFS(pivot, d * D, transposedMap);
-                    forwardCores[pivot] = this.DepthLimitedParallelBFS(pivot, d * D);
+                    /*
+                    backwardCores[pivot] = this.DepthLimitedBFS(pivot, d * D, transposedMap);
+                    forwardCores[pivot] = this.DepthLimitedBFS(pivot, d * D);
 
-                    backwardFringes[pivot] = new HashSet<int>(this.DepthLimitedParallelBFS(pivot, (d + 1) * D, transposedMap).Except(backwardCores[pivot]));
-                    forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedParallelBFS(pivot, (d + 1) * D).Except(forwardCores[pivot]));
+                    backwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap).Except(backwardCores[pivot]));
+                    forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D).Except(forwardCores[pivot]));
+                    */
+
+                    backwardCores[pivot] = this.DepthLimitedBFSWithTags(pivot, d * D, transposedMap, tagDictionary);
+                    forwardCores[pivot] = this.DepthLimitedBFSWithTags(pivot, d * D, tagDictionary);
+
+                    backwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, transposedMap, tagDictionary).Except(backwardCores[pivot]));
+                    forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, tagDictionary).Except(forwardCores[pivot]));
 
                     // Hoped to be able to just add connections straight away and not keep track of them,
                     // but then there are issues where the graph is changed during other threads' BFS, causing errors.
@@ -151,8 +161,6 @@ namespace SCC_Detection.Datastructures
                             S[id] = new HashSet<int>();
                         }
                         S[id].Add(pivot);
-
-                        //AddConnection(id, pivot);
                     }
 
                     foreach (int id in forwardCores[pivot].Union(forwardFringes[pivot]))
@@ -162,13 +170,7 @@ namespace SCC_Detection.Datastructures
                             S[pivot] = new HashSet<int>();
                         }
                         S[pivot].Add(id);
-
-                        //AddConnection(pivot, id);
                     }
-
-
-                    //TODO: add tags (?)
-                    // I think only needed when parallelising the algorithm.
                 });
 
                 Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
@@ -231,11 +233,8 @@ namespace SCC_Detection.Datastructures
             }
 
             ConcurrentDictionary<int, bool> reachable = new ConcurrentDictionary<int, bool>();
-
-            //ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
-            //ConcurrentBag<int> reachable = new ConcurrentBag<int>();
-
-            //TODO: maximum number of threads
+            
+            // Maximum number of threads
             //https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.paralleloptions.maxdegreeofparallelism?redirectedfrom=MSDN&view=net-5.0#System_Threading_Tasks_ParallelOptions_MaxDegreeOfParallelism
 
             lock (graphLock)
@@ -246,12 +245,9 @@ namespace SCC_Detection.Datastructures
                     {
                         if (!reachable.Keys.Contains(current.Key))
                         {
-                        //reachable.Add(current);
-                        reachable[current.Key] = true;
+                            reachable[current.Key] = true;
                         }
-
-                    //List<int> neighbours = map[current.Key];
-
+                        
                     // Only look at neighbours in set
                     // Because OBFR changes the graph
                     // which changes the neighbours, causing an error in the ForEach
@@ -286,7 +282,6 @@ namespace SCC_Detection.Datastructures
                 if (totalSet.Contains(current) && !reachable.Contains(current))
                 {
                     reachable.Add(current);
-                    //edge.Enqueue(current);
                 }
 
                 List<int> neighbours = map[current];
@@ -300,10 +295,8 @@ namespace SCC_Detection.Datastructures
 
                 foreach (int neighbour in neighboursInSet)
                 {
-                    // Look at the totalSet because we also use this for subgraphs
                     if (!reachable.Contains(neighbour))
                     {
-                        //reachable.Add(neighbour);
                         edge.Enqueue(neighbour);
                     }
                 }
@@ -410,38 +403,84 @@ namespace SCC_Detection.Datastructures
 
             return result;
         }
-
-        /// <summary>
-        /// First non-parallel version of shortcutting, not following the paper per se,
-        /// just to see if it does something for the performance.
-        /// </summary>
-        /// <param name="depth">maximum depth of the BFS search</param>
-        public void AddShortcuts(int depth)
+        
+        public HashSet<int> DepthLimitedBFSWithTags(int pivot, int depth, ConcurrentDictionary<int, List<int>> tagDictionary)
         {
-            List<int> vertices = Vertices().ToList();
-            vertices = Shuffled(vertices);
+            return DepthLimitedBFSWithTags(pivot, depth, this.map, tagDictionary);
+        }
 
-            Dictionary<int, bool> alive = new Dictionary<int, bool>();
+        //TODO: DepthLimitedParallelBFS implementeren
+        /// <summary>
+        /// BFS with a depth limit.
+        /// </summary>
+        /// <param name="pivot"></param>
+        /// <param name="depth"></param>
+        /// <returns></returns>
+        public HashSet<int> DepthLimitedBFSWithTags(int pivot, int depth, Dictionary<int, List<int>> map, ConcurrentDictionary<int, List<int>> tagDictionary)
+        {
+            // Item1 is the id, Item2 is the distance
+            Queue<Tuple<int, int>> edge = new Queue<Tuple<int, int>>();
+            edge.Enqueue(new Tuple<int, int>(pivot, 0));
+            Dictionary<int, int> reachable = new Dictionary<int, int>();
+            reachable[pivot] = 0;
 
-            foreach(int id in vertices)
+            // Use the convention that a vertex can reach itself always,
+            // Because that makes sense when defining a single vertex as a trivial SCC.
+
+            while (edge.Count > 0)
             {
-                alive[id] = true;
-            }
+                Tuple<int, int> current = edge.Dequeue();
 
-            foreach(int id in vertices)
-            {
-                if (!alive[id]) continue;
+                int currentID = current.Item1;
+                int currentDistance = current.Item2;
 
-                alive[id] = false;
-
-                HashSet<int> cluster = DepthLimitedBFS(id, depth);
-
-                foreach(int target in cluster)
+                // Check if it has not already been visited
+                // And check if a smaller tag has not already visited it.
+                if (!reachable.Keys.Contains(currentID) && !HasLowerTag(tagDictionary, currentID, pivot))//  && !HasLowerTag(tagDictionary, currentID, pivot)
                 {
-                    AddConnection(id, target);
-                    alive[target] = false;
+                    reachable[currentID] = currentDistance;
+                    /*
+                    if (!tagDictionary.ContainsKey(currentID))
+                    {
+                        tagDictionary[currentID] = new List<int>();
+                    }
+
+                    tagDictionary[currentID].Add(pivot);
+                    */
+                }
+
+                lock (graphLock)
+                {
+                    // Make it a new list to prevent it being changed during the foreach
+                    List<int> neighbours = new List<int>(map[current.Item1]);
+
+                    foreach (int neighbour in neighbours)
+                    {
+                        // Look at the totalSet because we also use this for subgraphs
+                        if (!reachable.Keys.Contains(neighbour)) // && !HasLowerTag(tagDictionary, neighbour, pivot)
+                        {
+                            //reachable.Add(neighbour);
+                            if (current.Item2 + 1 <= depth)
+                            {
+                                edge.Enqueue(new Tuple<int, int>(neighbour, current.Item2 + 1));
+                            }
+                        }
+                    }
                 }
             }
+
+            return new HashSet<int>(reachable.Keys);
+        }
+
+        private bool HasLowerTag(ConcurrentDictionary<int, List<int>> dict, int id, int tag)
+        {
+            if (!dict.ContainsKey(id) || dict[id].Count < 1) return false;
+
+            // To prevent the list from being changed while callculating Min()
+            //int[] a = new int[dict[id].Count];
+            //dict[id].CopyTo(a);
+
+            return dict[id].Min() < tag;
         }
 
         public HashSet<int> DepthLimitedBFS(int pivot, int depth)
@@ -471,10 +510,14 @@ namespace SCC_Detection.Datastructures
             {
                 Tuple<int, int> current = edge.Dequeue();
 
-                if (!reachable.Keys.Contains(current.Item1))
+                int currentID = current.Item1;
+                int currentDistance = current.Item2;
+
+                // Check if it has not already been visited
+                // And check if a smaller tag has not already visited it.
+                if (!reachable.Keys.Contains(currentID))
                 {
-                    reachable[current.Item1] = current.Item2;
-                    //edge.Enqueue(current);
+                    reachable[currentID] = currentDistance;
                 }
 
                 lock (graphLock)
