@@ -10,7 +10,7 @@ namespace SCC_Detection.Input
 {
     public class GraphParser
     {
-        public static Graph ReadFile(string filename)
+        public static Graph ReadFile(string filename, int threads)
         {
             Dictionary<int, List<int>> map = new Dictionary<int, List<int>>();
 
@@ -31,10 +31,10 @@ namespace SCC_Detection.Input
                 }
             }
 
-            return new Graph(map);
+            return new Graph(map, threads);
         }
 
-        public static Graph ReadFileSNAP(string filename)
+        public static Graph ReadFileSNAP(string filename, int threads)
         {
             Dictionary<int, List<int>> map = new Dictionary<int, List<int>>();
 
@@ -62,7 +62,7 @@ namespace SCC_Detection.Input
                 }
             }
 
-            return new Graph(map);
+            return new Graph(map, threads);
         }
     }
 }

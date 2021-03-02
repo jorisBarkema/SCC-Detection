@@ -68,9 +68,10 @@ namespace SCC_Detection_Test
                 Graph g = new Graph(testMap);
                 ResultSet results = detector.Compute(g);
 
+                Assert.AreEqual(3, results.List.Count);
+
                 for (int i = 0; i < 3; i++)
                 {
-                    Assert.AreEqual(3, results.List.Count);
                     Assert.IsTrue(results.Contains(i));
                 }
             }
@@ -159,7 +160,7 @@ namespace SCC_Detection_Test
 
             foreach(SCCDetector detector in this.concurrentDetectors)
             {
-                Graph g = RandomGraph.Generate(size, 0.05);
+                Graph g = RandomGraph.Generate(size, 0.05, 4);
                 Graph original = new Graph(g.GetMap());
 
                 ResultSet results = detector.Compute(g);
@@ -176,7 +177,7 @@ namespace SCC_Detection_Test
         {
             foreach (SCCDetector detector in this.concurrentDetectors)
             {
-                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph.txt");
+                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph.txt", 4);
                 Graph original = new Graph(g.GetMap());
 
                 ResultSet results = detector.Compute(g);
@@ -193,7 +194,7 @@ namespace SCC_Detection_Test
         {
             foreach (SCCDetector detector in this.concurrentDetectors)
             {
-                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph2.txt");
+                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph2.txt", 4);
                 Graph original = new Graph(g.GetMap());
 
                 ResultSet results = detector.Compute(g);

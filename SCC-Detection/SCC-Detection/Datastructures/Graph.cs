@@ -11,22 +11,29 @@ namespace SCC_Detection.Datastructures
     {
         private Dictionary<int, List<int>> map;
         private Dictionary<int, List<int>> transposedMap;
+        private ParallelOptions parallelOptions;
+        private bool shortcutsAdded = false;
 
         readonly object graphLock = new object();
 
-        //private int nodeCount = 0;
-        //private Dictionary<int, int> idMap = new Dictionary<int, int>();
-        //private List<int> reverseIdMap = new List<int>();
-
-        public Graph(Dictionary<int, List<int>> map)
+        Random rng;
+        
+        public Graph(Dictionary<int, List<int>> map, int threads = 1)
         {
+            this.rng = new Random();
+
             Graph.CheckMap(map);
             this.map = this.InitializeMap(map);
             this.transposedMap = Graph.Transpose(this.map);
+
+            this.parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = threads };
         }
 
-        public Graph(Graph g, bool transposed = false)
+        public Graph(Graph g, bool transposed = false, int threads = 1)
         {
+            this.rng = new Random();
+            this.parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = threads };
+
             if (transposed)
             {
                 this.map = g.GetTransposedMap();
@@ -48,46 +55,219 @@ namespace SCC_Detection.Datastructures
         /// <returns>HashSet of the reachable vertices</returns>
         public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
+            //return ParallelBFS(fromSet, totalSet, map);
+            return ParallelDigraphReachability(fromSet, totalSet, map);
+        }
+
+        private HashSet<int> ParallelDigraphReachability(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
+        {
+            if (!this.shortcutsAdded)
+            {
+                // Add the shortcuts
+                int h = 1; // Maximum recursion
+                ConcurrentDictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
+
+                Parallel.ForEach(shortcuts, parallelOptions, (shortcut) =>
+                {
+                    // Also parallelise this? Don't think it's worth it because this is already going on in parallel
+                    foreach (int to in shortcut.Value)
+                    {
+                        AddConnection(shortcut.Key, to);
+                    }
+                });
+
+                this.shortcutsAdded = true;
+            }
+
+            // Then perform parallel BFS
             return ParallelBFS(fromSet, totalSet, map);
         }
 
+        private ConcurrentDictionary<int, HashSet<int>> ParSC(HashSet<int> totalSet, int h)
+        {
+            if (h == 0) return new ConcurrentDictionary<int, HashSet<int>>();
+
+            ConcurrentDictionary<int, HashSet<int>> S = new ConcurrentDictionary<int, HashSet<int>>();
+
+            int count = totalSet.Count();
+            int current = 0;
+            int size = 1;
+
+            //TODO: bedenken wat deze waarden moeten zijn, misschien als eigenschappen van Graph class opslaan
+            int Nk = 1;
+            int Nl = 4;
+            int D = 1;
+
+            // Initialise the values
+            List<int> pivots = Shuffled(totalSet.ToList());
+            Dictionary<int, bool> alive = new Dictionary<int, bool>();
+
+            foreach (int k in totalSet)
+            {
+                alive[k] = true;
+            }
+
+            // Instead of calculating an appropriate k, we will check when we have done half the work and start decreasing then.
+            // Rework if I want to use an epsilon_pi other than 1 later.
+            while(current < pivots.Count - 1)
+            {
+                List<int> currentPivots = pivots.GetRange(current, Math.Min(size, pivots.Count - current));
+
+                current += size;
+
+                // Random value for d in [1, ..., Nl)
+                int d = rng.Next(Nl - 1) + 1;
+
+                // Ensure that d will always go down as we recurse deeper
+                // This is not yet exactly the same as the paper describes,
+                // but I don't understand the reasoning behind the complexity of the paper's version
+                d += h * Nl * Nk;
+
+                ConcurrentDictionary<int, HashSet<int>> backwardCores = new ConcurrentDictionary<int, HashSet<int>>();
+                ConcurrentDictionary<int, HashSet<int>> forwardCores = new ConcurrentDictionary<int, HashSet<int>>();
+
+                ConcurrentDictionary<int, HashSet<int>> backwardFringes = new ConcurrentDictionary<int, HashSet<int>>();
+                ConcurrentDictionary<int, HashSet<int>> forwardFringes = new ConcurrentDictionary<int, HashSet<int>>();
+
+                // TODO: dit kan efficienter met de tags zoals uitgelegd in de paper
+                Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
+                {
+                    if (!alive[pivot]) return;
+
+                    backwardCores[pivot] = this.DepthLimitedParallelBFS(pivot, d * D, transposedMap);
+                    forwardCores[pivot] = this.DepthLimitedParallelBFS(pivot, d * D);
+
+                    backwardFringes[pivot] = new HashSet<int>(this.DepthLimitedParallelBFS(pivot, (d + 1) * D, transposedMap).Except(backwardCores[pivot]));
+                    forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedParallelBFS(pivot, (d + 1) * D).Except(forwardCores[pivot]));
+
+                    // Hoped to be able to just add connections straight away and not keep track of them,
+                    // but then there are issues where the graph is changed during other threads' BFS, causing errors.
+                    // These can be fixed but require locks, throwing away the parallelism./
+                    // Instead add the edges in parallel after the ParSC is completed.
+                    foreach (int id in backwardCores[pivot].Union(backwardFringes[pivot]))
+                    {
+                        if (!S.ContainsKey(id))
+                        {
+                            S[id] = new HashSet<int>();
+                        }
+                        S[id].Add(pivot);
+
+                        //AddConnection(id, pivot);
+                    }
+
+                    foreach (int id in forwardCores[pivot].Union(forwardFringes[pivot]))
+                    {
+                        if (!S.ContainsKey(pivot))
+                        {
+                            S[pivot] = new HashSet<int>();
+                        }
+                        S[pivot].Add(id);
+
+                        //AddConnection(pivot, id);
+                    }
+
+
+                    //TODO: add tags (?)
+                    // I think only needed when parallelising the algorithm.
+                });
+
+                Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
+                {
+                    if (alive[pivot])
+                    {
+                        //TODO: something with the tags
+
+                        HashSet<int> VB = new HashSet<int>(forwardCores[pivot].Intersect(backwardCores[pivot]));
+                        HashSet<int> VS = new HashSet<int>(VB.Except(forwardCores[pivot]));
+                        HashSet<int> VP = new HashSet<int>(VB.Except(backwardCores[pivot]));
+
+                        // This also in parallel? I think I have too much or at least enough parallelism already
+                        ConcurrentDictionary<int, HashSet<int>> forwardS = ParSC(new HashSet<int>(VS.Union(forwardFringes[pivot])), h - 1);
+                        ConcurrentDictionary<int, HashSet<int>> backwardS = ParSC(new HashSet<int>(VP.Union(backwardFringes[pivot])), h - 1);
+
+                        foreach(KeyValuePair<int, HashSet<int>> pair in forwardS)
+                        {
+                            S[pair.Key].UnionWith(pair.Value);
+                        }
+
+                        foreach (KeyValuePair<int, HashSet<int>> pair in backwardS)
+                        {
+                            S[pair.Key].UnionWith(pair.Value);
+                        }
+                    }
+                });
+
+                foreach (int pivot in currentPivots)
+                {
+                    if (!alive[pivot]) continue;
+
+                    foreach (int id in forwardCores[pivot].Union(backwardCores[pivot]))
+                    {
+                        alive[id] = false;
+                    }
+                }
+
+                // Check if we've passed the halfway point and adapt the number of the next pivots accordingly
+                if (((current - size) * 2) <= count)
+                {
+                    size++;
+                } else
+                {
+                    size--;
+                }
+            }
+
+            return S;
+        }
+
+
         private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
         {
-            ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
-            ConcurrentBag<int> reachable = new ConcurrentBag<int>();
+            ConcurrentDictionary<int, bool> edge = new ConcurrentDictionary<int, bool>();
+
+            foreach(int id in fromSet)
+            {
+                edge[id] = true;
+            }
+
+            ConcurrentDictionary<int, bool> reachable = new ConcurrentDictionary<int, bool>();
+
+            //ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
+            //ConcurrentBag<int> reachable = new ConcurrentBag<int>();
 
             //TODO: maximum number of threads
             //https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.paralleloptions.maxdegreeofparallelism?redirectedfrom=MSDN&view=net-5.0#System_Threading_Tasks_ParallelOptions_MaxDegreeOfParallelism
 
-            while (edge.Except(reachable).Count() > 0)
+            lock (graphLock)
             {
-                Parallel.ForEach(edge, (current) =>
+                while (edge.Except(reachable).Count() > 0)
                 {
-                    if (!reachable.Contains(current))
+                    Parallel.ForEach(edge, parallelOptions, (current) =>
                     {
-                        reachable.Add(current);
-                    }
+                        if (!reachable.Keys.Contains(current.Key))
+                        {
+                        //reachable.Add(current);
+                        reachable[current.Key] = true;
+                        }
 
-                    List<int> neighbours = map[current];
+                    //List<int> neighbours = map[current.Key];
 
                     // Only look at neighbours in set
                     // Because OBFR changes the graph
                     // which changes the neighbours, causing an error in the ForEach
                     // but OBFR only changes the subgraph it is working on,
                     // so if we only look at the neighbours in the subgraph then this is no problem.
-                    List<int> neighboursInSet = totalSet.Intersect(neighbours).ToList();
+                    List<int> neighboursInSet = totalSet.Intersect(map[current.Key]).ToList();
 
-                    Parallel.ForEach(neighboursInSet, (neighbour) =>
-                    {
-                        if (!edge.Contains(neighbour))
+                        foreach (int neighbour in neighboursInSet)
                         {
-                            edge.Add(neighbour);
+                            edge[neighbour] = true;
                         }
                     });
-                });
+                }
             }
 
-            return new HashSet<int>(reachable);
+            return new HashSet<int>(reachable.Keys);
         }
 
         private HashSet<int> BFS(HashSet<int> fromSet, HashSet<int> totalSet, Dictionary<int, List<int>> map)
@@ -201,8 +381,6 @@ namespace SCC_Detection.Datastructures
         /// <returns>Shuffled list</returns>
         private List<T> Shuffled<T>(List<T> list)
         {
-            Random rng = new Random();
-
             int n = list.Count;
             while (n > 1)
             {
@@ -266,8 +444,19 @@ namespace SCC_Detection.Datastructures
             }
         }
 
-
         public HashSet<int> DepthLimitedBFS(int pivot, int depth)
+        {
+            return DepthLimitedBFS(pivot, depth, this.map);
+        }
+
+        //TODO: DepthLimitedParallelBFS implementeren
+        /// <summary>
+        /// BFS with a depth limit.
+        /// </summary>
+        /// <param name="pivot"></param>
+        /// <param name="depth"></param>
+        /// <returns></returns>
+        public HashSet<int> DepthLimitedBFS(int pivot, int depth, Dictionary<int, List<int>> map)
         {
             // Item1 is the id, Item2 is the distance
             Queue<Tuple<int, int>> edge = new Queue<Tuple<int, int>>();
@@ -288,19 +477,66 @@ namespace SCC_Detection.Datastructures
                     //edge.Enqueue(current);
                 }
 
-                List<int> neighbours = map[current.Item1];
-                
-                foreach (int neighbour in neighbours)
+                lock (graphLock)
                 {
-                    // Look at the totalSet because we also use this for subgraphs
-                    if (!reachable.Keys.Contains(neighbour))
+                    // Make it a new list to prevent it being changed during the foreach
+                    List<int> neighbours = new List<int>(map[current.Item1]);
+
+                    foreach (int neighbour in neighbours)
                     {
-                        //reachable.Add(neighbour);
-                        if (current.Item2 + 1 <= depth)
+                        // Look at the totalSet because we also use this for subgraphs
+                        if (!reachable.Keys.Contains(neighbour))
                         {
-                            edge.Enqueue(new Tuple<int, int>(neighbour, current.Item2 + 1));
+                            //reachable.Add(neighbour);
+                            if (current.Item2 + 1 <= depth)
+                            {
+                                edge.Enqueue(new Tuple<int, int>(neighbour, current.Item2 + 1));
+                            }
                         }
                     }
+                }
+            }
+
+            return new HashSet<int>(reachable.Keys);
+        }
+
+        public HashSet<int> DepthLimitedParallelBFS(int pivot, int depth)
+        {
+            return DepthLimitedParallelBFS(pivot, depth, this.map);
+        }
+
+        public HashSet<int> DepthLimitedParallelBFS(int pivot, int depth, Dictionary<int, List<int>> map)
+        {
+            ConcurrentDictionary<int, int> edge = new ConcurrentDictionary<int, int>();
+            ConcurrentDictionary<int, int> reachable = new ConcurrentDictionary<int, int>();
+
+            edge[pivot] = 0;
+            reachable[pivot] = 0;
+            
+            //TODO: maximum number of threads
+            //https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.paralleloptions.maxdegreeofparallelism?redirectedfrom=MSDN&view=net-5.0#System_Threading_Tasks_ParallelOptions_MaxDegreeOfParallelism
+
+            lock (graphLock)
+            {
+                while (edge.Except(reachable).Count() > 0)
+                {
+                    Parallel.ForEach(edge, parallelOptions, (current) =>
+                    {
+                        if (!reachable.Keys.Contains(current.Key))
+                        {
+                            reachable[current.Key] = current.Value;
+                        }
+
+                        if (current.Value < depth)
+                        {
+                            List<int> neighboursInSet = map[current.Key];
+
+                            foreach (int neighbour in neighboursInSet)
+                            {
+                                edge[neighbour] = current.Value + 1;
+                            }
+                        }
+                    });
                 }
             }
 
@@ -606,20 +842,30 @@ namespace SCC_Detection.Datastructures
 
         public void AddConnection(int from, int to)
         {
-            if (!this.map[from].Contains(to))
+            lock(this.graphLock)
             {
-                this.map[from].Add(to);
-            }
+                if (from == to || !this.map.ContainsKey(from) || !this.transposedMap.ContainsKey(to)) return;
 
-            if (!this.transposedMap[to].Contains(from))
-            {
-                this.transposedMap[to].Add(from);
+                if (!this.map[from].Contains(to))
+                {
+                    this.map[from].Add(to);
+                }
+
+                if (!this.transposedMap[to].Contains(from))
+                {
+                    this.transposedMap[to].Add(from);
+                }
             }
+            
         }
         public void RemoveConnection(int from, int to)
         {
-            this.map[from].Remove(to);
-            this.transposedMap[to].Remove(from);
+            lock(this.graphLock)
+            {
+                this.map[from].Remove(to);
+                this.transposedMap[to].Remove(from);
+            }
+            
         }
         
         public void RemoveNode(int id)

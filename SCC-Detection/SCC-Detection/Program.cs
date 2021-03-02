@@ -30,10 +30,10 @@ namespace SCC_Detection
                 case "file":
                     if (args.Length == 6)
                     {
-                        g = CreateFileGraph(args[4], args[5], detectors);
+                        g = CreateFileGraph(args[4], args[5], detectors, threads);
                     } else if (args.Length == 5)
                     {
-                        g = CreateFileGraph(args[4], "LIST", detectors);
+                        g = CreateFileGraph(args[4], "LIST", detectors, threads);
                     } else
                     {
                         throw new Exception("Invalid arguments given for file input");
@@ -42,7 +42,7 @@ namespace SCC_Detection
                 case "random":
                     if (args.Length == 6)
                     {
-                        g = CreateRandomGraph(int.Parse(args[4]), double.Parse(args[5]), detectors);
+                        g = CreateRandomGraph(int.Parse(args[4]), double.Parse(args[5]), detectors, threads);
                     }
                     else
                     {
@@ -102,14 +102,14 @@ namespace SCC_Detection
             Console.ReadLine();
         }
 
-        private static Graph CreateFileGraph(string filename, string filetype, SCCDetector[] detectors)
+        private static Graph CreateFileGraph(string filename, string filetype, SCCDetector[] detectors, int threads)
         {
-            return filetype == "SNAP" ? GraphParser.ReadFileSNAP(filename) : GraphParser.ReadFile(filename);
+            return filetype == "SNAP" ? GraphParser.ReadFileSNAP(filename, threads) : GraphParser.ReadFile(filename, threads);
         }
 
-        private static Graph CreateRandomGraph(int n, double p, SCCDetector[] detectors)
+        private static Graph CreateRandomGraph(int n, double p, SCCDetector[] detectors, int threads)
         {
-            return RandomGraph.Generate(n, p);
+            return RandomGraph.Generate(n, p, threads);
         }
 
         private static Graph CreateTreeGraph()
@@ -129,7 +129,7 @@ namespace SCC_Detection
                 case "MULTIPIVOT":
                     return new SCCDetector[1] { new MultiPivot(threads) };
                 case "ALL":
-                    return new SCCDetector[3] { new DCSC(threads), new OBFR(threads), new MultiPivot(threads) };
+                    return new SCCDetector[3] { new OBFR(threads), new DCSC(threads), new MultiPivot(threads) };
                 default:
                     throw new Exception("Invalid algorithms input passed");
             }

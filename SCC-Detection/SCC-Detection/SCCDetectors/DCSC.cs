@@ -118,9 +118,12 @@ namespace SCC_Detection.SCCDetectors
             forward.ExceptWith(SCC);
             backward.ExceptWith(SCC);
             
-            this.taskList.Enqueue(subgraph);
-            this.taskList.Enqueue(forward);
-            this.taskList.Enqueue(backward);
+            //TODO: maybe if the count is < than some threshold, do it straight away here and do not add to queue.
+            // prevents some parallelism overhead, but want to experiment for the correct threshold when the rest is done.
+
+            if (subgraph.Count > 0) this.taskList.Enqueue(subgraph);
+            if (forward.Count > 0) this.taskList.Enqueue(forward);
+            if (backward.Count > 0) this.taskList.Enqueue(backward);
 
             lock(pulseLock)
             {
