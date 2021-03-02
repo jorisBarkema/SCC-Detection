@@ -11,19 +11,13 @@ namespace SCC_Detection.Datastructures
     {
         private Dictionary<int, List<int>> map;
         private Dictionary<int, List<int>> transposedMap;
+        private ParallelOptions parallelOptions;
+        private bool shortcutsAdded = false;
 
         readonly object graphLock = new object();
 
         Random rng;
-
-        private ParallelOptions parallelOptions;
-
-        private bool shortcutsAdded = false;
-
-        //private int nodeCount = 0;
-        //private Dictionary<int, int> idMap = new Dictionary<int, int>();
-        //private List<int> reverseIdMap = new List<int>();
-
+        
         public Graph(Dictionary<int, List<int>> map, int threads = 1)
         {
             this.rng = new Random();
@@ -71,7 +65,7 @@ namespace SCC_Detection.Datastructures
             {
                 // Add the shortcuts
                 int h = 1; // Maximum recursion
-                Dictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
+                ConcurrentDictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
 
                 Parallel.ForEach(shortcuts, parallelOptions, (shortcut) =>
                 {
@@ -89,18 +83,18 @@ namespace SCC_Detection.Datastructures
             return ParallelBFS(fromSet, totalSet, map);
         }
 
-        private Dictionary<int, HashSet<int>> ParSC(HashSet<int> totalSet, int h)
+        private ConcurrentDictionary<int, HashSet<int>> ParSC(HashSet<int> totalSet, int h)
         {
-            if (h == 0) return new Dictionary<int, HashSet<int>>();
+            if (h == 0) return new ConcurrentDictionary<int, HashSet<int>>();
 
-            Dictionary<int, HashSet<int>> S = new Dictionary<int, HashSet<int>>();
+            ConcurrentDictionary<int, HashSet<int>> S = new ConcurrentDictionary<int, HashSet<int>>();
 
             int count = totalSet.Count();
             int current = 0;
             int size = 1;
 
             //TODO: bedenken wat deze waarden moeten zijn, misschien als eigenschappen van Graph class opslaan
-            //int Nk = 1;
+            int Nk = 1;
             int Nl = 4;
             int D = 1;
 
@@ -127,24 +121,25 @@ namespace SCC_Detection.Datastructures
                 // Ensure that d will always go down as we recurse deeper
                 // This is not yet exactly the same as the paper describes,
                 // but I don't understand the reasoning behind the complexity of the paper's version
-                d += h * Nl;
+                d += h * Nl * Nk;
 
-                Dictionary<int, HashSet<int>> backwardCores = new Dictionary<int, HashSet<int>>();
-                Dictionary<int, HashSet<int>> forwardCores = new Dictionary<int, HashSet<int>>();
+                ConcurrentDictionary<int, HashSet<int>> backwardCores = new ConcurrentDictionary<int, HashSet<int>>();
+                ConcurrentDictionary<int, HashSet<int>> forwardCores = new ConcurrentDictionary<int, HashSet<int>>();
 
-                Dictionary<int, HashSet<int>> backwardFringes = new Dictionary<int, HashSet<int>>();
-                Dictionary<int, HashSet<int>> forwardFringes = new Dictionary<int, HashSet<int>>();
+                ConcurrentDictionary<int, HashSet<int>> backwardFringes = new ConcurrentDictionary<int, HashSet<int>>();
+                ConcurrentDictionary<int, HashSet<int>> forwardFringes = new ConcurrentDictionary<int, HashSet<int>>();
 
-                foreach (int pivot in currentPivots)
+                // TODO: dit kan efficienter met de tags zoals uitgelegd in de paper
+                Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
                 {
-                    if (!alive[pivot]) continue;
+                    if (!alive[pivot]) return;
 
                     backwardCores[pivot] = this.DepthLimitedParallelBFS(pivot, d * D, transposedMap);
                     forwardCores[pivot] = this.DepthLimitedParallelBFS(pivot, d * D);
 
                     backwardFringes[pivot] = new HashSet<int>(this.DepthLimitedParallelBFS(pivot, (d + 1) * D, transposedMap).Except(backwardCores[pivot]));
                     forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedParallelBFS(pivot, (d + 1) * D).Except(forwardCores[pivot]));
-                    
+
                     // Hoped to be able to just add connections straight away and not keep track of them,
                     // but then there are issues where the graph is changed during other threads' BFS, causing errors.
                     // These can be fixed but require locks, throwing away the parallelism./
@@ -156,7 +151,7 @@ namespace SCC_Detection.Datastructures
                             S[id] = new HashSet<int>();
                         }
                         S[id].Add(pivot);
-                        
+
                         //AddConnection(id, pivot);
                     }
 
@@ -170,11 +165,11 @@ namespace SCC_Detection.Datastructures
 
                         //AddConnection(pivot, id);
                     }
-                    
+
 
                     //TODO: add tags (?)
                     // I think only needed when parallelising the algorithm.
-                }
+                });
 
                 Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
                 {
@@ -187,8 +182,8 @@ namespace SCC_Detection.Datastructures
                         HashSet<int> VP = new HashSet<int>(VB.Except(backwardCores[pivot]));
 
                         // This also in parallel? I think I have too much or at least enough parallelism already
-                        Dictionary<int, HashSet<int>> forwardS = ParSC(new HashSet<int>(VS.Union(forwardFringes[pivot])), h - 1);
-                        Dictionary<int, HashSet<int>> backwardS = ParSC(new HashSet<int>(VP.Union(backwardFringes[pivot])), h - 1);
+                        ConcurrentDictionary<int, HashSet<int>> forwardS = ParSC(new HashSet<int>(VS.Union(forwardFringes[pivot])), h - 1);
+                        ConcurrentDictionary<int, HashSet<int>> backwardS = ParSC(new HashSet<int>(VP.Union(backwardFringes[pivot])), h - 1);
 
                         foreach(KeyValuePair<int, HashSet<int>> pair in forwardS)
                         {

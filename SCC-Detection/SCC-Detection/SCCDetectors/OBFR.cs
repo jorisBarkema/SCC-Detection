@@ -158,9 +158,6 @@ namespace SCC_Detection.SCCDetectors
                     }
                 }
             }
-            
-
-            //HashSet<int> nextSeeds = NextSeeds(trimmed);
         }
 
         public Slice Trim(Slice slice) => this.Trim(slice, this.g);
