@@ -60,20 +60,26 @@ namespace SCC_Detection
 
             //Console.WriteLine(g.ToString());
 
-            // Run at highest priority to minimize fluctuations caused by other processes/threads
+            // Run at highest priority to minimize fluctuations caused by other running processes
             Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
 
             Stopwatch stopwatch = new Stopwatch();
 
+            Graph original = new Graph(g.GetMap());
+
             foreach (SCCDetector detector in detectors)
             {
                 Console.WriteLine("Warming up " + detector.Name);
+                g = new Graph(original.GetMap(), threads);
+
                 ResultSet r = detector.Compute(g);
 
                 List<long> durations = new List<long>();
 
                 for (int i = 0; i < tests; i++)
                 {
+                    g = new Graph(original.GetMap(), threads);
+
                     // clean up
                     GC.Collect();
                     GC.WaitForPendingFinalizers();

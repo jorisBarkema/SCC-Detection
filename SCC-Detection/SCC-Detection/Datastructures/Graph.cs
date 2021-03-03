@@ -63,6 +63,8 @@ namespace SCC_Detection.Datastructures
         {
             if (!this.shortcutsAdded)
             {
+                this.shortcutsAdded = true;
+
                 // Add the shortcuts
                 int h = 1; // Maximum recursion
                 ConcurrentDictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
@@ -75,8 +77,6 @@ namespace SCC_Detection.Datastructures
                         AddConnection(shortcut.Key, to);
                     }
                 });
-
-                this.shortcutsAdded = true;
             }
 
             // Then perform parallel BFS
@@ -436,7 +436,7 @@ namespace SCC_Detection.Datastructures
 
                 // Check if it has not already been visited
                 // And check if a smaller tag has not already visited it.
-                if (!reachable.Keys.Contains(currentID) && !HasLowerTag(tagDictionary, currentID, pivot))//  && !HasLowerTag(tagDictionary, currentID, pivot)
+                if (!reachable.Keys.Contains(currentID))//  && !HasLowerTag(tagDictionary, currentID, pivot)
                 {
                     reachable[currentID] = currentDistance;
                     /*
