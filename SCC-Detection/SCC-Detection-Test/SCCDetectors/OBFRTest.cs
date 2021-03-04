@@ -2,6 +2,7 @@
 using SCC_Detection.Datastructures;
 using SCC_Detection.SCCDetectors;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,14 +13,14 @@ namespace SCC_Detection_Test
     public class OBFRTest
     {
         private OBFR obfr;
-        private Dictionary<int, List<int>> testMap;
+        private ConcurrentDictionary<int, List<int>> testMap;
 
         [TestInitialize]
         public void InitializeTest()
         {
             //SCCDetectorTest.detectors = new SCCDetector[] { new DCSC(1), new OBFR(1) };
             this.obfr = new OBFR(1);
-            this.testMap = new Dictionary<int, List<int>>();
+            this.testMap = new ConcurrentDictionary<int, List<int>>();
         }
 
         /// <summary>

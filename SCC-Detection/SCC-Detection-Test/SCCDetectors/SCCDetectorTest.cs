@@ -8,6 +8,7 @@ using SCC_Detection.Datastructures;
 using SCC_Detection.SCCDetectors;
 using SCC_Detection.Input;
 using System.Linq;
+using System.Collections.Concurrent;
 
 namespace SCC_Detection_Test
 {
@@ -16,7 +17,7 @@ namespace SCC_Detection_Test
     {
         private SCCDetector[] detectors;
         private SCCDetector[] concurrentDetectors;
-        private Dictionary<int, List<int>> testMap;
+        private ConcurrentDictionary<int, List<int>> testMap;
 
         [TestInitialize]
         public void InitializeTest()
@@ -24,7 +25,7 @@ namespace SCC_Detection_Test
             this.detectors = new SCCDetector[] {  new OBFR(1), new DCSC(1), new MultiPivot(1) };
             this.concurrentDetectors = new SCCDetector[] { new OBFR(10), new DCSC(10), new MultiPivot(10) };
             //this.detectors = new SCCDetector[] { new DCSC(1) };
-            this.testMap = new Dictionary<int, List<int>>();
+            this.testMap = new ConcurrentDictionary<int, List<int>>();
         }
 
         [TestMethod]
