@@ -56,8 +56,8 @@ namespace SCC_Detection.Datastructures
         /// <returns>HashSet of the reachable vertices</returns>
         public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
         {
-            return ParallelBFS(fromSet, totalSet, map);
-            //return ParallelDigraphReachability(fromSet, totalSet, map);
+            //return ParallelBFS(fromSet, totalSet, map);
+            return ParallelDigraphReachability(fromSet, totalSet, map);
         }
 
         private HashSet<int> ParallelDigraphReachability(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
@@ -84,6 +84,18 @@ namespace SCC_Detection.Datastructures
                 int h = 1; // Maximum recursion
                 ConcurrentDictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
 
+                foreach(KeyValuePair<int, HashSet<int>> shortcut in shortcuts)
+                {
+                    foreach (int to in shortcut.Value)
+                    {
+                        AddConnection(shortcut.Key, to);
+                    }
+                }
+
+                // Should be working, but sometimes this method hangs for ~20s, debugging where this happens now.
+                // Without the Parallel here, it only seems ot be aroudn 10 seconds
+
+                /*
                 Parallel.ForEach(shortcuts, parallelOptions, (shortcut) =>
                 {
                     // Also parallelise this? Don't think it's worth it because this is already going on in parallel
@@ -92,6 +104,7 @@ namespace SCC_Detection.Datastructures
                         AddConnection(shortcut.Key, to);
                     }
                 });
+                */
             }
 
             // Then perform parallel BFS
@@ -172,20 +185,33 @@ namespace SCC_Detection.Datastructures
                     // Instead add the edges in parallel after the ParSC is completed.
                     foreach (int id in backwardCores[pivot].Union(backwardFringes[pivot]))
                     {
+                        /*
                         if (!S.ContainsKey(id))
                         {
                             S[id] = new HashSet<int>();
                         }
                         S[id].Add(pivot);
+                        */
+
+                        S.AddOrUpdate(id, new HashSet<int> { pivot }, (key, value) => {
+                            value.Add(pivot);
+                            return value;
+                        });
                     }
 
                     foreach (int id in forwardCores[pivot].Union(forwardFringes[pivot]))
                     {
+                        S.AddOrUpdate(pivot, new HashSet<int> { id }, (key, value) => {
+                            value.Add(id);
+                            return value;
+                        });
+                        /*
                         if (!S.ContainsKey(pivot))
                         {
                             S[pivot] = new HashSet<int>();
                         }
                         S[pivot].Add(id);
+                        */
                     }
                 });
 
