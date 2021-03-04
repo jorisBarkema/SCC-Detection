@@ -15,7 +15,9 @@ namespace SCC_Detection.Datastructures
         private bool shortcutsAdded = false;
 
         Random rng;
-        
+
+        private readonly object graphLock = new object();
+
         public Graph(ConcurrentDictionary<int, List<int>> map, int threads = 1)
         {
             this.rng = new Random();
@@ -30,6 +32,7 @@ namespace SCC_Detection.Datastructures
         public Graph(Graph g, bool transposed = false, int threads = 1)
         {
             this.rng = new Random();
+
             this.parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = threads };
 
             if (transposed)
@@ -59,10 +62,24 @@ namespace SCC_Detection.Datastructures
 
         private HashSet<int> ParallelDigraphReachability(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
         {
+            bool shouldAddShortcuts = false;
+
+            // Make sure to only add the shortcuts the first time
+            // The extra if is to prevent locking delays for after the first time
             if (!this.shortcutsAdded)
             {
-                this.shortcutsAdded = true;
-
+                lock (graphLock)
+                {
+                    if (!this.shortcutsAdded)
+                    {
+                        shouldAddShortcuts = true;
+                        this.shortcutsAdded = true;
+                    }
+                }
+            }
+                
+            if (shouldAddShortcuts)
+            {
                 // Add the shortcuts
                 int h = 1; // Maximum recursion
                 ConcurrentDictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
