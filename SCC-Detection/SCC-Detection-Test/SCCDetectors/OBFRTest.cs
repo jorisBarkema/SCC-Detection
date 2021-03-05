@@ -86,6 +86,7 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void trimTestOneSeed()
         {
+            // 0 --> 1 --> 2 <--> 3 <-- 4
             this.singleLoopGraph();
 
             Graph g = new Graph(this.testMap);
