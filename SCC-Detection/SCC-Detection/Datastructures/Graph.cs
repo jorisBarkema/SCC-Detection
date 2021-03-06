@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -84,6 +85,8 @@ namespace SCC_Detection.Datastructures
                 int h = 1; // Maximum recursion
                 ConcurrentDictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
 
+                Console.WriteLine("Adding " + shortcuts.Keys.Count + " shortcuts");
+
                 foreach(KeyValuePair<int, HashSet<int>> shortcut in shortcuts)
                 {
                     foreach (int to in shortcut.Value)
@@ -117,10 +120,6 @@ namespace SCC_Detection.Datastructures
 
             ConcurrentDictionary<int, HashSet<int>> S = new ConcurrentDictionary<int, HashSet<int>>();
 
-            int count = totalSet.Count();
-            int current = 0;
-            int size = 1;
-
             //TODO: bedenken wat deze waarden moeten zijn, misschien als eigenschappen van Graph class opslaan
             int Nk = 1;
             int Nl = 4;
@@ -135,13 +134,17 @@ namespace SCC_Detection.Datastructures
                 alive[k] = true;
             }
 
-            // Instead of calculating an appropriate k, we will check when we have done half the work and start decreasing then.
-            // Rework if I want to use an epsilon_pi other than 1 later.
-            while(current < pivots.Count - 1)
-            {
-                List<int> currentPivots = pivots.GetRange(current, Math.Min(size, pivots.Count - current));
+            // for debugging
+            int deadcount = 0;
 
-                current += size;
+            List<List<int>> pivotGroups = GetPivotGroups(pivots);
+
+            Stopwatch s = new Stopwatch();
+
+            foreach(List<int> currentPivots in pivotGroups)
+            {
+                //Console.WriteLine("Doing ParSC for " + currentPivots.Count + " pivots");
+                s.Restart();
 
                 // Random value for d in [1, ..., Nl)
                 int d = rng.Next(Nl - 1) + 1;
@@ -151,11 +154,11 @@ namespace SCC_Detection.Datastructures
                 // but I don't understand the reasoning behind the complexity of the paper's version
                 d += h * Nl * Nk;
 
-                ConcurrentDictionary<int, HashSet<int>> backwardCores = new ConcurrentDictionary<int, HashSet<int>>();
-                ConcurrentDictionary<int, HashSet<int>> forwardCores = new ConcurrentDictionary<int, HashSet<int>>();
+                ConcurrentDictionary<int, HashSet<int>> backwardCoresDictionary = new ConcurrentDictionary<int, HashSet<int>>();
+                ConcurrentDictionary<int, HashSet<int>> forwardCoresDictionary = new ConcurrentDictionary<int, HashSet<int>>();
 
-                ConcurrentDictionary<int, HashSet<int>> backwardFringes = new ConcurrentDictionary<int, HashSet<int>>();
-                ConcurrentDictionary<int, HashSet<int>> forwardFringes = new ConcurrentDictionary<int, HashSet<int>>();
+                ConcurrentDictionary<int, HashSet<int>> backwardFringesDictionary = new ConcurrentDictionary<int, HashSet<int>>();
+                ConcurrentDictionary<int, HashSet<int>> forwardFringesDictionary = new ConcurrentDictionary<int, HashSet<int>>();
 
                 ConcurrentDictionary<int, List<int>> tagDictionary = new ConcurrentDictionary<int, List<int>>();
 
@@ -163,13 +166,18 @@ namespace SCC_Detection.Datastructures
                 {
                     if (!alive[pivot]) return;
 
-                    
-                    backwardCores[pivot] = this.DepthLimitedBFS(pivot, d * D, transposedMap);
-                    forwardCores[pivot] = this.DepthLimitedBFS(pivot, d * D);
+                    backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, transposedMap));
+                    forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D));
 
-                    backwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap).Except(backwardCores[pivot]));
-                    forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D).Except(forwardCores[pivot]));
-                    
+                    // This logic is repeated a loooottt so needs a rework, but first fix the annoying bug with the huge delay
+                    HashSet<int> forwardCore;
+                    HashSet<int> backwardCore;
+
+                    forwardCoresDictionary.TryGetValue(pivot, out forwardCore);
+                    backwardCoresDictionary.TryGetValue(pivot, out backwardCore);
+
+                    backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap).Except(backwardCore)));
+                    forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D).Except(forwardCore)));
 
                     /*
                     backwardCores[pivot] = this.DepthLimitedBFSWithTags(pivot, d * D, transposedMap, tagDictionary);
@@ -179,20 +187,24 @@ namespace SCC_Detection.Datastructures
                     forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, tagDictionary).Except(forwardCores[pivot]));
                     */
 
+                    HashSet<int> forwardFringe;
+                    HashSet<int> backwardFringe;
 
-                    // Hoped to be able to just add connections straight away and not keep track of them,
-                    // but then there are issues where the graph is changed during other threads' BFS, causing errors.
-                    // These can be fixed but require locks, throwing away the parallelism./
-                    // Instead add the edges in parallel after the ParSC is completed.
-                    foreach (int id in backwardCores[pivot].Union(backwardFringes[pivot]))
+                    forwardFringesDictionary.TryGetValue(pivot, out forwardFringe);
+                    backwardFringesDictionary.TryGetValue(pivot, out backwardFringe);
+
+                    foreach (int id in backwardCore.Union(backwardFringe))
                     {
                         S.AddOrUpdate(id, new HashSet<int> { pivot }, (key, value) => {
+                            // This can go wrong when adding an item causes a need for an array bound increase
+                            // for the array underlying the hashset. This happens almost never however,
+                            // and making this safe would be super slow so just accept the risk
                             value.Add(pivot);
                             return value;
                         });
                     }
 
-                    foreach (int id in forwardCores[pivot].Union(forwardFringes[pivot]))
+                    foreach (int id in forwardCore.Union(forwardFringe))
                     {
                         S.AddOrUpdate(pivot, new HashSet<int> { id }, (key, value) => {
                             value.Add(id);
@@ -201,55 +213,97 @@ namespace SCC_Detection.Datastructures
                     }
                 });
 
+                //Console.WriteLine("Time for dfs loop:       " + s.ElapsedMilliseconds);
+
                 Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
                 {
-                    if (alive[pivot])
+                    if (!alive[pivot]) return;
+
+                    HashSet<int> forwardCore;
+                    HashSet<int> backwardCore;
+                    HashSet<int> forwardFringe;
+                    HashSet<int> backwardFringe;
+
+                    forwardCoresDictionary.TryGetValue(pivot, out forwardCore);
+                    backwardCoresDictionary.TryGetValue(pivot, out backwardCore);
+                    forwardFringesDictionary.TryGetValue(pivot, out forwardFringe);
+                    backwardFringesDictionary.TryGetValue(pivot, out backwardFringe);
+
+                    //TODO: something with the tags
+
+                    HashSet<int> VB = new HashSet<int>(forwardCore.Intersect(backwardCoresDictionary[pivot]));
+                    HashSet<int> VS = new HashSet<int>(VB.Except(forwardCore));
+                    HashSet<int> VP = new HashSet<int>(VB.Except(backwardCoresDictionary[pivot]));
+
+                    // This also in parallel? I think I have too much or at least enough parallelism already
+                    ConcurrentDictionary<int, HashSet<int>> forwardS = ParSC(new HashSet<int>(VS.Union(forwardFringe)), h - 1);
+                    ConcurrentDictionary<int, HashSet<int>> backwardS = ParSC(new HashSet<int>(VP.Union(backwardFringe)), h - 1);
+
+                    foreach (KeyValuePair<int, HashSet<int>> pair in forwardS)
                     {
-                        //TODO: something with the tags
+                        S[pair.Key].UnionWith(pair.Value);
+                    }
 
-                        HashSet<int> VB = new HashSet<int>(forwardCores[pivot].Intersect(backwardCores[pivot]));
-                        HashSet<int> VS = new HashSet<int>(VB.Except(forwardCores[pivot]));
-                        HashSet<int> VP = new HashSet<int>(VB.Except(backwardCores[pivot]));
-                        
-                        // This also in parallel? I think I have too much or at least enough parallelism already
-                        ConcurrentDictionary<int, HashSet<int>> forwardS = ParSC(new HashSet<int>(VS.Union(forwardFringes[pivot])), h - 1);
-                        ConcurrentDictionary<int, HashSet<int>> backwardS = ParSC(new HashSet<int>(VP.Union(backwardFringes[pivot])), h - 1);
-
-                        foreach(KeyValuePair<int, HashSet<int>> pair in forwardS)
-                        {
-                            S[pair.Key].UnionWith(pair.Value);
-                        }
-
-                        foreach (KeyValuePair<int, HashSet<int>> pair in backwardS)
-                        {
-                            S[pair.Key].UnionWith(pair.Value);
-                        }
+                    foreach (KeyValuePair<int, HashSet<int>> pair in backwardS)
+                    {
+                        S[pair.Key].UnionWith(pair.Value);
                     }
                 });
+
+                //Console.WriteLine("Time for shortcuts loop: " + s.ElapsedMilliseconds);
 
                 foreach (int pivot in currentPivots)
                 {
                     if (!alive[pivot]) continue;
 
-                    foreach (int id in forwardCores[pivot].Union(backwardCores[pivot]))
+                    HashSet<int> forwardCore;
+                    HashSet<int> backwardCore;
+
+                    forwardCoresDictionary.TryGetValue(pivot, out forwardCore);
+                    backwardCoresDictionary.TryGetValue(pivot, out backwardCore);
+
+                    foreach (int id in forwardCore.Union(backwardCore))
                     {
+                        if (alive[id]) deadcount++;
                         alive[id] = false;
                     }
                 }
 
-                // Check if we've passed the halfway point and adapt the number of the next pivots accordingly
-                if (((current - size) * 2) <= count)
-                {
-                    size++;
-                } else
-                {
-                    size--;
-                }
+                Console.WriteLine(deadcount + " dead vertices");
+
+                //Console.WriteLine("Time for aliveness loop: " + s.ElapsedMilliseconds);
             }
 
             return S;
         }
 
+        private List<List<int>> GetPivotGroups(List<int> pivots)
+        {
+            List<List<int>> groups = new List<List<int>>();
+
+            int current = 0;
+            int size = 1;
+
+            while (current < pivots.Count - 1)
+            {
+                List<int> group = pivots.GetRange(current, Math.Min(size, pivots.Count - current));
+                groups.Add(group);
+
+                // Check if we've passed the halfway point and adapt the number of the next pivots accordingly
+                if ((current * 2) <= pivots.Count)
+                {
+                    size++;
+                }
+                else
+                {
+                    size--;
+                }
+
+                current += size;
+            }
+
+            return groups;
+        }
 
         private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
         {
@@ -542,7 +596,9 @@ namespace SCC_Detection.Datastructures
         /// <returns></returns>
         public HashSet<int> DepthLimitedBFS(int pivot, int depth, ConcurrentDictionary<int, List<int>> map)
         {
-            //depth = 2;
+            // With this line the huge delay bug never happens
+            // depth = 2;
+            //Console.Write(depth + " ");
 
             // Item1 is the id, Item2 is the distance
             Queue<Tuple<int, int>> edge = new Queue<Tuple<int, int>>();
@@ -561,7 +617,6 @@ namespace SCC_Detection.Datastructures
 
                 reachable.Add(currentID);
 
-                // Get the list into a new list to prevent it being changed during the foreach
                 // TryGetValue is lock-free:
                 // https://arbel.net/2013/02/03/best-practices-for-using-concurrentdictionary/
                 List<int> neighbours;
@@ -569,14 +624,9 @@ namespace SCC_Detection.Datastructures
                 {
                     foreach (int neighbour in neighbours)
                     {
-                        // Look at the totalSet because we also use this for subgraphs
-                        if (!reachable.Contains(neighbour))
+                        if (!reachable.Contains(neighbour) && (currentDistance < depth))
                         {
-                            //reachable.Add(neighbour);
-                            if (currentDistance + 1 <= depth)
-                            {
-                                edge.Enqueue(new Tuple<int, int>(neighbour, currentDistance + 1));
-                            }
+                            edge.Enqueue(new Tuple<int, int>(neighbour, currentDistance + 1));
                         }
                     }
                 }

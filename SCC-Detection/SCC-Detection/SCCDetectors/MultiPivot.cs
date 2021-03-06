@@ -78,13 +78,12 @@ namespace SCC_Detection.SCCDetectors
 
                 this.status[id] = true;
 
-                lock (pulseLock)
-                {
-                    Monitor.PulseAll(pulseLock);
-                }
-
                 if (this.Done())
                 {
+                    lock (pulseLock)
+                    {
+                        Monitor.PulseAll(pulseLock);
+                    }
                     return;
                 }
 
