@@ -82,11 +82,10 @@ namespace SCC_Detection.Datastructures
             if (shouldAddShortcuts)
             {
                 // Add the shortcuts
-                int h = 1; // Maximum recursion
+                int h = 3; // Maximum recursion
                 ConcurrentDictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
 
-                Console.WriteLine("Adding " + shortcuts.Keys.Count + " shortcuts");
-
+                
                 foreach(KeyValuePair<int, HashSet<int>> shortcut in shortcuts)
                 {
                     foreach (int to in shortcut.Value)
@@ -94,10 +93,9 @@ namespace SCC_Detection.Datastructures
                         AddConnection(shortcut.Key, to);
                     }
                 }
+                
 
-                // Should be working, but sometimes this method hangs for ~20s, debugging where this happens now.
-                // Without the Parallel here, it only seems ot be aroudn 10 seconds
-
+                // Parallel here seems to be around the same speed / slightly slower
                 /*
                 Parallel.ForEach(shortcuts, parallelOptions, (shortcut) =>
                 {
@@ -166,26 +164,23 @@ namespace SCC_Detection.Datastructures
                 {
                     if (!alive[pivot]) return;
 
-                    backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, transposedMap));
-                    forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D));
+                    //backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, transposedMap, alive));
+                    //forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, alive));
 
-                    // This logic is repeated a loooottt so needs a rework, but first fix the annoying bug with the huge delay
+                    backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, transposedMap, alive, tagDictionary));
+                    forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, alive, tagDictionary));
+
                     HashSet<int> forwardCore;
                     HashSet<int> backwardCore;
 
                     forwardCoresDictionary.TryGetValue(pivot, out forwardCore);
                     backwardCoresDictionary.TryGetValue(pivot, out backwardCore);
 
-                    backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap).Except(backwardCore)));
-                    forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D).Except(forwardCore)));
+                    //backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap, alive).Except(backwardCore)));
+                    //forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, alive).Except(forwardCore)));
 
-                    /*
-                    backwardCores[pivot] = this.DepthLimitedBFSWithTags(pivot, d * D, transposedMap, tagDictionary);
-                    forwardCores[pivot] = this.DepthLimitedBFSWithTags(pivot, d * D, tagDictionary);
-
-                    backwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, transposedMap, tagDictionary).Except(backwardCores[pivot]));
-                    forwardFringes[pivot] = new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, tagDictionary).Except(forwardCores[pivot]));
-                    */
+                    backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, transposedMap, alive, tagDictionary).Except(backwardCore)));
+                    forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, alive, tagDictionary).Except(forwardCore)));
 
                     HashSet<int> forwardFringe;
                     HashSet<int> backwardFringe;
@@ -269,7 +264,7 @@ namespace SCC_Detection.Datastructures
                     }
                 }
 
-                Console.WriteLine(deadcount + " dead vertices");
+                //Console.WriteLine(deadcount + " dead vertices");
 
                 //Console.WriteLine("Time for aliveness loop: " + s.ElapsedMilliseconds);
             }
@@ -500,27 +495,26 @@ namespace SCC_Detection.Datastructures
             return result;
         }
         
-        public HashSet<int> DepthLimitedBFSWithTags(int pivot, int depth, ConcurrentDictionary<int, List<int>> tagDictionary)
+        public HashSet<int> DepthLimitedBFSWithTags(int pivot, int depth, Dictionary<int, bool> alive, ConcurrentDictionary<int, List<int>> tagDictionary)
         {
-            return DepthLimitedBFSWithTags(pivot, depth, this.map, tagDictionary);
+            return DepthLimitedBFSWithTags(pivot, depth, this.map, alive, tagDictionary);
         }
 
-        //TODO: DepthLimitedParallelBFS implementeren
         /// <summary>
-        /// BFS with a depth limit.
+        /// BFS with a depth limit and using tags to prevent concurrent searches from identical vertices
         /// </summary>
         /// <param name="pivot"></param>
         /// <param name="depth"></param>
         /// <returns></returns>
-        public HashSet<int> DepthLimitedBFSWithTags(int pivot, int depth, ConcurrentDictionary<int, List<int>> map, ConcurrentDictionary<int, List<int>> tagDictionary)
+        public HashSet<int> DepthLimitedBFSWithTags(int pivot, int depth, ConcurrentDictionary<int, List<int>> map, Dictionary<int, bool> alive, ConcurrentDictionary<int, List<int>> tagDictionary)
         {
             // Item1 is the id, Item2 is the distance
             Queue<Tuple<int, int>> edge = new Queue<Tuple<int, int>>();
             edge.Enqueue(new Tuple<int, int>(pivot, 0));
-            HashSet<int> reachable = new HashSet<int>();
 
             // Use the convention that a vertex can reach itself always,
             // Because that makes sense when defining a single vertex as a trivial SCC.
+            HashSet<int> reachable = new HashSet<int>();
 
             while (edge.Count > 0)
             {
@@ -529,8 +523,7 @@ namespace SCC_Detection.Datastructures
                 int currentID = current.Item1;
                 int currentDistance = current.Item2;
 
-                // Check if it has not already been visited
-                // And check if a smaller tag has not already visited it.
+
                 if (!HasLowerTag(tagDictionary, currentID, pivot))
                 {
                     reachable.Add(currentID);
@@ -539,23 +532,18 @@ namespace SCC_Detection.Datastructures
                         value.Add(pivot);
                         return value;
                     });
-                }
 
-                // Get the list into a new list to prevent it being changed during the foreach
-                // TryGetValue is lock-free:
-                // https://arbel.net/2013/02/03/best-practices-for-using-concurrentdictionary/
-                List<int> neighbours = new List<int>();
-                map.TryGetValue(currentID, out neighbours);
-
-                foreach (int neighbour in neighbours)
-                {
-                    // Look at the totalSet because we also use this for subgraphs
-                    if (!reachable.Contains(neighbour)) // && !HasLowerTag(tagDictionary, neighbour, pivot)
+                    // TryGetValue is lock-free:
+                    // https://arbel.net/2013/02/03/best-practices-for-using-concurrentdictionary/
+                    List<int> neighbours;
+                    if (map.TryGetValue(currentID, out neighbours))
                     {
-                        //reachable.Add(neighbour);
-                        if (current.Item2 + 1 <= depth)
+                        foreach (int neighbour in neighbours)
                         {
-                            edge.Enqueue(new Tuple<int, int>(neighbour, current.Item2 + 1));
+                            if (alive[neighbour] && !reachable.Contains(neighbour) && (currentDistance < depth))
+                            {
+                                edge.Enqueue(new Tuple<int, int>(neighbour, currentDistance + 1));
+                            }
                         }
                     }
                 }
@@ -566,6 +554,7 @@ namespace SCC_Detection.Datastructures
 
         private bool HasLowerTag(ConcurrentDictionary<int, List<int>> dict, int id, int tag)
         {
+            //return false;
             //if (!dict.ContainsKey(id)) return false;
 
             // To prevent the list from being changed while callculating Min()
@@ -582,9 +571,9 @@ namespace SCC_Detection.Datastructures
             return false;
         }
 
-        public HashSet<int> DepthLimitedBFS(int pivot, int depth)
+        public HashSet<int> DepthLimitedBFS(int pivot, int depth, Dictionary<int, bool> alive)
         {
-            return DepthLimitedBFS(pivot, depth, this.map);
+            return DepthLimitedBFS(pivot, depth, this.map, alive);
         }
 
         //TODO: DepthLimitedParallelBFS implementeren
@@ -594,12 +583,8 @@ namespace SCC_Detection.Datastructures
         /// <param name="pivot"></param>
         /// <param name="depth"></param>
         /// <returns></returns>
-        public HashSet<int> DepthLimitedBFS(int pivot, int depth, ConcurrentDictionary<int, List<int>> map)
+        public HashSet<int> DepthLimitedBFS(int pivot, int depth, ConcurrentDictionary<int, List<int>> map, Dictionary<int, bool> alive)
         {
-            // With this line the huge delay bug never happens
-            // depth = 2;
-            //Console.Write(depth + " ");
-
             // Item1 is the id, Item2 is the distance
             Queue<Tuple<int, int>> edge = new Queue<Tuple<int, int>>();
             edge.Enqueue(new Tuple<int, int>(pivot, 0));
@@ -624,7 +609,7 @@ namespace SCC_Detection.Datastructures
                 {
                     foreach (int neighbour in neighbours)
                     {
-                        if (!reachable.Contains(neighbour) && (currentDistance < depth))
+                        if (alive[neighbour] && !reachable.Contains(neighbour) && (currentDistance < depth))
                         {
                             edge.Enqueue(new Tuple<int, int>(neighbour, currentDistance + 1));
                         }
