@@ -314,11 +314,18 @@ namespace SCC_Detection_Test
 
             Graph g = new Graph(testMap);
 
-            HashSet<int> reachable = g.DepthLimitedBFS(0, 2);
+            Dictionary<int, bool> alive = new Dictionary<int, bool>();
+            alive[0] = true;
+            alive[1] = true;
+            alive[2] = true;
+            alive[3] = true;
+            alive[4] = true;
+
+            HashSet<int> reachable = g.DepthLimitedBFS(0, 2, alive);
 
             CollectionAssert.AreEquivalent(new int[] { 0, 1, 2 }.ToList(), reachable.ToList());
 
-            reachable = g.DepthLimitedBFS(0, 10);
+            reachable = g.DepthLimitedBFS(0, 10, alive);
 
             CollectionAssert.AreEquivalent(new int[] { 0, 1, 2, 3 }.ToList(), reachable.ToList());
         }

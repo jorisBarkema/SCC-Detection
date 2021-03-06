@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SCC_Detection.Datastructures
@@ -18,6 +19,7 @@ namespace SCC_Detection.Datastructures
         Random rng;
 
         private readonly object graphLock = new object();
+        ReaderWriterLock rwl = new ReaderWriterLock();
 
         public Graph(ConcurrentDictionary<int, List<int>> map, int threads = 1)
         {
@@ -127,23 +129,16 @@ namespace SCC_Detection.Datastructures
             List<int> pivots = Shuffled(totalSet.ToList());
             Dictionary<int, bool> alive = new Dictionary<int, bool>();
 
-            foreach (int k in totalSet)
+            foreach (int k in this.Vertices())
             {
                 alive[k] = true;
             }
 
-            // for debugging
-            int deadcount = 0;
-
             List<List<int>> pivotGroups = GetPivotGroups(pivots);
 
-            Stopwatch s = new Stopwatch();
-
-            foreach(List<int> currentPivots in pivotGroups)
+            //foreach(List<int> currentPivots in pivotGroups)
+            Parallel.ForEach(pivotGroups, parallelOptions, (currentPivots) =>
             {
-                //Console.WriteLine("Doing ParSC for " + currentPivots.Count + " pivots");
-                s.Restart();
-
                 // Random value for d in [1, ..., Nl)
                 int d = rng.Next(Nl - 1) + 1;
 
@@ -164,11 +159,13 @@ namespace SCC_Detection.Datastructures
                 {
                     if (!alive[pivot]) return;
 
-                    //backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, transposedMap, alive));
-                    //forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, alive));
+                    // Do this with or without tags depending on what I'm testing
 
-                    backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, transposedMap, alive, tagDictionary));
-                    forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, alive, tagDictionary));
+                    backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, transposedMap, alive));
+                    forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, alive));
+
+                    //backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, transposedMap, alive, tagDictionary));
+                    //forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, alive, tagDictionary));
 
                     HashSet<int> forwardCore;
                     HashSet<int> backwardCore;
@@ -176,11 +173,11 @@ namespace SCC_Detection.Datastructures
                     forwardCoresDictionary.TryGetValue(pivot, out forwardCore);
                     backwardCoresDictionary.TryGetValue(pivot, out backwardCore);
 
-                    //backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap, alive).Except(backwardCore)));
-                    //forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, alive).Except(forwardCore)));
+                    backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap, alive).Except(backwardCore)));
+                    forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, alive).Except(forwardCore)));
 
-                    backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, transposedMap, alive, tagDictionary).Except(backwardCore)));
-                    forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, alive, tagDictionary).Except(forwardCore)));
+                    //backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, transposedMap, alive, tagDictionary).Except(backwardCore)));
+                    //forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, alive, tagDictionary).Except(forwardCore)));
 
                     HashSet<int> forwardFringe;
                     HashSet<int> backwardFringe;
@@ -190,7 +187,8 @@ namespace SCC_Detection.Datastructures
 
                     foreach (int id in backwardCore.Union(backwardFringe))
                     {
-                        S.AddOrUpdate(id, new HashSet<int> { pivot }, (key, value) => {
+                        S.AddOrUpdate(id, new HashSet<int> { pivot }, (key, value) =>
+                        {
                             // This can go wrong when adding an item causes a need for an array bound increase
                             // for the array underlying the hashset. This happens almost never however,
                             // and making this safe would be super slow so just accept the risk
@@ -201,14 +199,13 @@ namespace SCC_Detection.Datastructures
 
                     foreach (int id in forwardCore.Union(forwardFringe))
                     {
-                        S.AddOrUpdate(pivot, new HashSet<int> { id }, (key, value) => {
+                        S.AddOrUpdate(pivot, new HashSet<int> { id }, (key, value) =>
+                        {
                             value.Add(id);
                             return value;
                         });
                     }
                 });
-
-                //Console.WriteLine("Time for dfs loop:       " + s.ElapsedMilliseconds);
 
                 Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
                 {
@@ -224,7 +221,43 @@ namespace SCC_Detection.Datastructures
                     forwardFringesDictionary.TryGetValue(pivot, out forwardFringe);
                     backwardFringesDictionary.TryGetValue(pivot, out backwardFringe);
 
-                    //TODO: something with the tags
+                    // Remove the vertices which have also been visited by another search
+                    // Don't think this will make the algorithm faster, but the paper says to do it
+                    // Remove this when testing without tags
+
+                    /*
+                    int[] forwardCoreCopy = new int[forwardCore.Count];
+                    forwardCore.CopyTo(forwardCoreCopy);
+
+                    foreach (int v in forwardCoreCopy)
+                    {
+                        if (HasLowerTag(tagDictionary, v, pivot)) forwardCore.Remove(v);
+                    }
+
+                    int[] backwardCoreCopy = new int[backwardCore.Count];
+                    backwardCore.CopyTo(backwardCoreCopy);
+
+                    foreach (int v in backwardCoreCopy)
+                    {
+                        if (HasLowerTag(tagDictionary, v, pivot)) backwardCore.Remove(v);
+                    }
+
+                    int[] forwardFringeCopy = new int[forwardFringe.Count];
+                    forwardFringe.CopyTo(forwardFringeCopy);
+
+                    foreach (int v in forwardFringeCopy)
+                    {
+                        if (HasLowerTag(tagDictionary, v, pivot)) forwardFringe.Remove(v);
+                    }
+
+                    int[] backwardFringeCopy = new int[backwardFringe.Count];
+                    backwardFringe.CopyTo(backwardFringeCopy);
+
+                    foreach (int v in backwardFringeCopy)
+                    {
+                        if (HasLowerTag(tagDictionary, v, pivot)) backwardFringe.Remove(v);
+                    }
+                    */
 
                     HashSet<int> VB = new HashSet<int>(forwardCore.Intersect(backwardCoresDictionary[pivot]));
                     HashSet<int> VS = new HashSet<int>(VB.Except(forwardCore));
@@ -245,8 +278,6 @@ namespace SCC_Detection.Datastructures
                     }
                 });
 
-                //Console.WriteLine("Time for shortcuts loop: " + s.ElapsedMilliseconds);
-
                 foreach (int pivot in currentPivots)
                 {
                     if (!alive[pivot]) continue;
@@ -259,15 +290,10 @@ namespace SCC_Detection.Datastructures
 
                     foreach (int id in forwardCore.Union(backwardCore))
                     {
-                        if (alive[id]) deadcount++;
                         alive[id] = false;
                     }
                 }
-
-                //Console.WriteLine(deadcount + " dead vertices");
-
-                //Console.WriteLine("Time for aliveness loop: " + s.ElapsedMilliseconds);
-            }
+            });
 
             return S;
         }
@@ -284,8 +310,10 @@ namespace SCC_Detection.Datastructures
                 List<int> group = pivots.GetRange(current, Math.Min(size, pivots.Count - current));
                 groups.Add(group);
 
+                current += size;
+
                 // Check if we've passed the halfway point and adapt the number of the next pivots accordingly
-                if ((current * 2) <= pivots.Count)
+                if (((current - size) * 2) <= pivots.Count)
                 {
                     size++;
                 }
@@ -293,8 +321,6 @@ namespace SCC_Detection.Datastructures
                 {
                     size--;
                 }
-
-                current += size;
             }
 
             return groups;
@@ -489,7 +515,7 @@ namespace SCC_Detection.Datastructures
 
             foreach (KeyValuePair<int, List<int>> entry in map)
             {
-                result[entry.Key] = entry.Value;
+                result.TryAdd(entry.Key, entry.Value);
             }
 
             return result;
@@ -527,12 +553,35 @@ namespace SCC_Detection.Datastructures
                 if (!HasLowerTag(tagDictionary, currentID, pivot))
                 {
                     reachable.Add(currentID);
+                    /*
+                    try
+                    {
+                        rwl.AcquireWriterLock(100);
+                        tagDictionary.AddOrUpdate(currentID, new List<int> { pivot }, (key, value) => {
+                            value.Add(pivot);
+                            return value;
+                        });
+                    }
+                    finally
+                    {
+                        rwl.ReleaseWriterLock();
+                    }
+                    */
 
+                    lock(graphLock)
+                    {
+                        tagDictionary.AddOrUpdate(currentID, new List<int> { pivot }, (key, value) => {
+                            value.Add(pivot);
+                            return value;
+                        });
+                    }
+
+                    /*
                     tagDictionary.AddOrUpdate(currentID, new List<int> { pivot }, (key, value) => {
                         value.Add(pivot);
                         return value;
                     });
-
+                    */
                     // TryGetValue is lock-free:
                     // https://arbel.net/2013/02/03/best-practices-for-using-concurrentdictionary/
                     List<int> neighbours;
@@ -554,18 +603,35 @@ namespace SCC_Detection.Datastructures
 
         private bool HasLowerTag(ConcurrentDictionary<int, List<int>> dict, int id, int tag)
         {
-            //return false;
-            //if (!dict.ContainsKey(id)) return false;
-
-            // To prevent the list from being changed while callculating Min()
-            //int[] a = new int[dict[id].Count];
-            //dict[id].CopyTo(a);
-
             List<int> values = new List<int>();
+            //int min = Int32.MaxValue;
 
             if (dict.TryGetValue(id, out values))
             {
-                return values.Min() < tag;
+                //int[] valuesArray = new int[values.Count];
+                //values.CopyTo(valuesArray);
+
+
+                //return values.Min() < tag;
+
+                lock(graphLock)
+                {
+                    return values.Min() < tag;
+                }
+
+                /*
+                try
+                {
+                    rwl.AcquireReaderLock(100);
+                    min = values.Min();
+                }
+                finally
+                {
+                    rwl.ReleaseReaderLock();
+                }
+
+                return min < tag;
+                */
             }
 
             return false;
@@ -620,7 +686,7 @@ namespace SCC_Detection.Datastructures
             return reachable;
         }
 
-        /* OUTDATED
+        /* OUTDATED and I think not needed because the paralellism is added elsewhere
         public HashSet<int> DepthLimitedParallelBFS(int pivot, int depth)
         {
             return DepthLimitedParallelBFS(pivot, depth, this.map);
@@ -872,12 +938,6 @@ namespace SCC_Detection.Datastructures
 
         public int InDegree(int id)
         {
-            /*
-            if (!transposedMap.ContainsKey(id)) return 0;
-
-            return transposedMap[id].Count;
-            */
-
             List<int> predecessors;
 
             if (transposedMap.TryGetValue(id, out predecessors))
@@ -892,11 +952,6 @@ namespace SCC_Detection.Datastructures
 
         public int OutDegree(int id)
         {
-            /*
-            if (!map.ContainsKey(id)) return 0;
-
-            return map[id].Count;
-            */
             List<int> successors;
             if (map.TryGetValue(id, out successors))
             {
@@ -909,12 +964,6 @@ namespace SCC_Detection.Datastructures
 
         public List<int> ImmediateSuccessors(int id)
         {
-            /*
-            if (!map.ContainsKey(id)) return null;
-
-            return map[id];
-            */
-
             List<int> successors;
 
             if (map.TryGetValue(id, out successors))
@@ -923,7 +972,7 @@ namespace SCC_Detection.Datastructures
             }
             else
             {
-                return null;
+                return new List<int>();
             }
         }
 
@@ -942,8 +991,6 @@ namespace SCC_Detection.Datastructures
             {
                 map.TryGetValue(id, out list);
                 result.UnionWith(list);
-
-                //result.UnionWith(map[id]);
             }
 
             result.IntersectWith(subgraph);
@@ -953,12 +1000,6 @@ namespace SCC_Detection.Datastructures
 
         public List<int> ImmediatePredecessors(int id)
         {
-            /*
-            if (!transposedMap.ContainsKey(id)) return null;
-
-            return transposedMap[id];
-            */
-
             List<int> predecessors;
 
             if (transposedMap.TryGetValue(id, out predecessors))
@@ -967,26 +1008,14 @@ namespace SCC_Detection.Datastructures
             }
             else
             {
-                return null;
+                return new List<int>();
             }
         }
 
         public void AddConnection(int from, int to)
         {
             if (from == to) return;
-
-            /*
-            if (!this.map[from].Contains(to))
-            {
-                this.map[from].Add(to);
-            }
-
-            if (!this.transposedMap[to].Contains(from))
-            {
-                this.transposedMap[to].Add(from);
-            }
-            */
-
+            
             List<int> fromList;
             List<int> toList;
 
@@ -1010,12 +1039,11 @@ namespace SCC_Detection.Datastructures
                 fromList.Remove(to);
             }
 
+            // This will very rarely throw an ArgumentOutOfRangeException
             if (transposedMap.TryGetValue(to, out toList))
             {
                 toList.Remove(from);
             }
-            //this.map[from].Remove(to);
-            //this.transposedMap[to].Remove(from);
         }
         
         public void RemoveNode(int id)
@@ -1044,27 +1072,6 @@ namespace SCC_Detection.Datastructures
                     this.RemoveConnection(v, id);
                 }
             }
-
-            /*
-            // Remove the connections with the node
-            // Make a copy because you cannot alter the iterator
-            int[] copy_successors = new int[this.map[id].Count];
-            this.map[id].CopyTo(copy_successors);
-
-            foreach (int v in copy_successors)
-            {
-                this.RemoveConnection(id, v);
-            }
-            
-
-            int[] copy_predecessors = new int[this.transposedMap[id].Count];
-            this.transposedMap[id].CopyTo(copy_predecessors);
-
-            foreach (int v in copy_predecessors)
-            {
-                this.RemoveConnection(v, id);
-            }
-            */
 
             // Remove the node from the map
             this.map.TryRemove(id, out _);
@@ -1149,11 +1156,6 @@ namespace SCC_Detection.Datastructures
             {
                 return false;
             }
-
-            /*
-            List<int> neighbours = map[id];
-            return neighbours == null || neighbours.Count == 0;
-            */
         }
 
         public override string ToString()
