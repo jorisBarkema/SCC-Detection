@@ -30,6 +30,7 @@ namespace SCC_Detection.SCCDetectors
         readonly object pulseLock = new object();
         readonly object finishedLock = new object();
 
+        private bool busy;
         bool[] status;
         ConcurrentQueue<Slice> taskList;
 
@@ -38,6 +39,7 @@ namespace SCC_Detection.SCCDetectors
             this.Name = "OBFR";
             this.threadcount = threadcount;
             this.status = new bool[threadcount];
+            this.busy = true;
             this.Result = new ResultSet();
             this.taskList = new ConcurrentQueue<Slice>();
         }
@@ -46,6 +48,7 @@ namespace SCC_Detection.SCCDetectors
         public override ResultSet Compute(Graph g)
         {
             this.g = g;
+            this.busy = true;
 
             // Divide the graph into rooted subgraphs
             HashSet<int> total = g.Vertices();
@@ -85,6 +88,8 @@ namespace SCC_Detection.SCCDetectors
                 Monitor.Wait(finishedLock);
             }
 
+            this.busy = false;
+
             lock (pulseLock)
             {
                 Monitor.PulseAll(pulseLock);
@@ -98,7 +103,7 @@ namespace SCC_Detection.SCCDetectors
         {
             Slice slice;
 
-            while (true)
+            while (this.busy)
             {
                 while (taskList.TryDequeue(out slice))
                 {
@@ -110,12 +115,9 @@ namespace SCC_Detection.SCCDetectors
                 
                 if (this.Done())
                 {
-                    lock (pulseLock)
+                    lock (finishedLock)
                     {
-                        lock (finishedLock)
-                        {
-                            Monitor.Pulse(finishedLock);
-                        }
+                        Monitor.Pulse(finishedLock);
                     }
 
                     return;

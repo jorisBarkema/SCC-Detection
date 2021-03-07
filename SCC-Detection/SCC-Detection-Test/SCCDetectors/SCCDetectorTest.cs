@@ -24,7 +24,10 @@ namespace SCC_Detection_Test
         {
             this.detectors = new SCCDetector[] {  new OBFR(1), new DCSC(1), new MultiPivot(1) };
             this.concurrentDetectors = new SCCDetector[] { new OBFR(10), new DCSC(10), new MultiPivot(10) };
-            //this.detectors = new SCCDetector[] { new DCSC(1) };
+
+            //this.detectors = new SCCDetector[] {  new DCSC(1) };
+            //this.concurrentDetectors = new SCCDetector[] { new DCSC(10) };
+
             this.testMap = new ConcurrentDictionary<int, List<int>>();
         }
 

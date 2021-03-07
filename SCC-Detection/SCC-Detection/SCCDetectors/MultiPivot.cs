@@ -21,6 +21,7 @@ namespace SCC_Detection.SCCDetectors
         int threadcount;
         ConcurrentQueue<HashSet<int>> taskList;
 
+        private bool busy;
         bool[] status;
         Graph g;
 
@@ -30,6 +31,7 @@ namespace SCC_Detection.SCCDetectors
 
             this.threadcount = threadcount;
             this.status = new bool[threadcount];
+            this.busy = true;
 
             this.result = new ResultSet();
 
@@ -39,6 +41,7 @@ namespace SCC_Detection.SCCDetectors
         public override ResultSet Compute(Graph g)
         {
             this.g = g;
+            this.busy = true;
 
             taskList.Enqueue(g.Vertices());
 
@@ -68,6 +71,8 @@ namespace SCC_Detection.SCCDetectors
                 Monitor.Wait(finishedLock);
             }
 
+            this.busy = false;
+
             lock (pulseLock)
             {
                 Monitor.PulseAll(pulseLock);
@@ -80,7 +85,7 @@ namespace SCC_Detection.SCCDetectors
         {
             HashSet<int> subgraph;
 
-            while (true)
+            while (this.busy)
             {
                 while (taskList.TryDequeue(out subgraph))
                 {
@@ -92,12 +97,9 @@ namespace SCC_Detection.SCCDetectors
 
                 if (this.Done())
                 {
-                    lock (pulseLock)
+                    lock (finishedLock)
                     {
-                        lock (finishedLock)
-                        {
-                            Monitor.Pulse(finishedLock);
-                        }
+                        Monitor.Pulse(finishedLock);
                     }
                     return;
                 }
