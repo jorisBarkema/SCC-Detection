@@ -8,6 +8,7 @@ using SCC_Detection.Datastructures;
 using SCC_Detection.SCCDetectors;
 using SCC_Detection.Input;
 using System.Linq;
+using System.Collections.Concurrent;
 
 namespace SCC_Detection_Test
 {
@@ -16,15 +17,18 @@ namespace SCC_Detection_Test
     {
         private SCCDetector[] detectors;
         private SCCDetector[] concurrentDetectors;
-        private Dictionary<int, List<int>> testMap;
+        private ConcurrentDictionary<int, List<int>> testMap;
 
         [TestInitialize]
         public void InitializeTest()
         {
             this.detectors = new SCCDetector[] {  new OBFR(1), new DCSC(1), new MultiPivot(1) };
             this.concurrentDetectors = new SCCDetector[] { new OBFR(10), new DCSC(10), new MultiPivot(10) };
-            //this.detectors = new SCCDetector[] { new DCSC(1) };
-            this.testMap = new Dictionary<int, List<int>>();
+
+            //this.detectors = new SCCDetector[] {  new DCSC(1) };
+            //this.concurrentDetectors = new SCCDetector[] { new DCSC(10) };
+
+            this.testMap = new ConcurrentDictionary<int, List<int>>();
         }
 
         [TestMethod]
@@ -177,7 +181,7 @@ namespace SCC_Detection_Test
         {
             foreach (SCCDetector detector in this.concurrentDetectors)
             {
-                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph.txt", 4);
+                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\scriptie\graphs\test_graph.txt", 4);
                 Graph original = new Graph(g.GetMap());
 
                 ResultSet results = detector.Compute(g);
@@ -194,7 +198,7 @@ namespace SCC_Detection_Test
         {
             foreach (SCCDetector detector in this.concurrentDetectors)
             {
-                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\test_graph2.txt", 4);
+                Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\scriptie\graphs\test_graph2.txt", 4);
                 Graph original = new Graph(g.GetMap());
 
                 ResultSet results = detector.Compute(g);

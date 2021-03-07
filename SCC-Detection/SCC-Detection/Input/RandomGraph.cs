@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 
@@ -10,7 +11,7 @@ namespace SCC_Detection.Input
     {
         public static Graph Generate(int n, double p, int threads)
         {
-            Dictionary<int, List<int>> map = new Dictionary<int, List<int>>();
+            ConcurrentDictionary<int, List<int>> map = new ConcurrentDictionary<int, List<int>>();
 
             Random r = new Random();
 

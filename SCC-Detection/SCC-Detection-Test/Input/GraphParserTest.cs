@@ -13,7 +13,7 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void ReadSnapTest()
         {
-            Graph g = GraphParser.ReadFileSNAP(@"D:\Documents\computing_science\master_thesis\graphs\SNAPTest.txt");
+            Graph g = GraphParser.ReadFileSNAP(@"D:\Documents\computing_science\scriptie\graphs\SNAP_test.txt", 1);
 
             Assert.AreEqual(6, g.Vertices().Count);
             string s = g.ToString();
@@ -24,13 +24,13 @@ namespace SCC_Detection_Test
         [ExpectedException(typeof(FormatException))]
         public void InvalidSnapTest()
         {
-            Graph g = GraphParser.ReadFileSNAP(@"D:\Documents\computing_science\master_thesis\graphs\InvalidSNAPTest.txt");
+            Graph g = GraphParser.ReadFileSNAP(@"D:\Documents\computing_science\scriptie\graphs\invalid_SNAP_test.txt", 1);
         }
 
         [TestMethod]
         public void ReadListTest()
         {
-            Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\master_thesis\graphs\ListTest.txt");
+            Graph g = GraphParser.ReadFile(@"D:\Documents\computing_science\scriptie\graphs\list_test.txt", 1);
 
             Assert.AreEqual(6, g.Vertices().Count);
             string s = g.ToString();

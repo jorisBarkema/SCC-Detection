@@ -5,18 +5,19 @@ using System.Collections.Generic;
 using System.Linq;
 
 using SCC_Detection.Datastructures;
+using System.Collections.Concurrent;
 
 namespace SCC_Detection_Test
 {
     [TestClass]
     public class GraphTest
     {
-        private Dictionary<int, List<int>> testMap;
+        private ConcurrentDictionary<int, List<int>> testMap;
 
         [TestInitialize] //this doesn't work!
         public void InitializeTest()
         {
-            this.testMap = new Dictionary<int, List<int>>();
+            this.testMap = new ConcurrentDictionary<int, List<int>>();
         }
 
         /// <summary>
@@ -107,13 +108,13 @@ namespace SCC_Detection_Test
 
             Graph g = new Graph(testMap);
 
-            Dictionary<int, List<int>> graphMap = g.GetMap();
+            ConcurrentDictionary<int, List<int>> graphMap = g.GetMap();
 
             CollectionAssert.AreEquivalent(new int[] { 1, 2 }.ToList(), graphMap[0]);
             CollectionAssert.AreEquivalent(new int[] { 2 }.ToList(), graphMap[1]);
             CollectionAssert.AreEquivalent(new int[] { }.ToList(), graphMap[2]);
-            
-            Dictionary<int, List<int>> transposedGraphMap = g.GetTransposedMap();
+
+            ConcurrentDictionary<int, List<int>> transposedGraphMap = g.GetTransposedMap();
 
             CollectionAssert.AreEquivalent(new int[] { }.ToList(), transposedGraphMap[0]);
             CollectionAssert.AreEquivalent(new int[] { 0 }.ToList(), transposedGraphMap[1]);
@@ -133,7 +134,7 @@ namespace SCC_Detection_Test
             testMap[3] = new List<int>();
 
             Graph g = new Graph(testMap);
-            Dictionary<int, List<int>> graphMap = g.GetMap();
+            ConcurrentDictionary<int, List<int>> graphMap = g.GetMap();
             HashSet<int> totalSet = new HashSet<int>(graphMap.Keys);
             HashSet<int> withoutThree = new HashSet<int>(new int[] { 0, 1, 2 });
 
@@ -203,7 +204,7 @@ namespace SCC_Detection_Test
 
             Graph g = new Graph(testMap);
 
-            Dictionary<int, List<int>> graphMap = g.GetMap();
+            ConcurrentDictionary<int, List<int>> graphMap = g.GetMap();
 
             CollectionAssert.AreEquivalent(new int[] { 1 }.ToList(), graphMap[0]);
 
@@ -226,7 +227,7 @@ namespace SCC_Detection_Test
 
             Graph g = new Graph(testMap);
 
-            Dictionary<int, List<int>> graphMap = g.GetMap();
+            ConcurrentDictionary<int, List<int>> graphMap = g.GetMap();
 
             CollectionAssert.AreEquivalent(new int[] { 1 }.ToList(), graphMap[0]);
 
@@ -288,7 +289,7 @@ namespace SCC_Detection_Test
 
             Graph g = new Graph(testMap);
 
-            Dictionary<int, List<int>> graphMap = g.GetMap();
+            ConcurrentDictionary<int, List<int>> graphMap = g.GetMap();
 
             CollectionAssert.AreEquivalent(new int[] { 1 }.ToList(), graphMap[0]);
 
@@ -313,11 +314,18 @@ namespace SCC_Detection_Test
 
             Graph g = new Graph(testMap);
 
-            HashSet<int> reachable = g.DepthLimitedBFS(0, 2);
+            Dictionary<int, bool> alive = new Dictionary<int, bool>();
+            alive[0] = true;
+            alive[1] = true;
+            alive[2] = true;
+            alive[3] = true;
+            alive[4] = true;
+
+            HashSet<int> reachable = g.DepthLimitedBFS(0, 2, alive);
 
             CollectionAssert.AreEquivalent(new int[] { 0, 1, 2 }.ToList(), reachable.ToList());
 
-            reachable = g.DepthLimitedBFS(0, 10);
+            reachable = g.DepthLimitedBFS(0, 10, alive);
 
             CollectionAssert.AreEquivalent(new int[] { 0, 1, 2, 3 }.ToList(), reachable.ToList());
         }

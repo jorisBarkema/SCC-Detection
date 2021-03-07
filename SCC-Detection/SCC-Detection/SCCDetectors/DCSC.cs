@@ -12,11 +12,13 @@ namespace SCC_Detection.SCCDetectors
     public class DCSC : SCCDetector
     {
         readonly object pulseLock = new object();
+        readonly object finishedLock = new object();
 
         ResultSet result;
         int threadcount;
         ConcurrentQueue<HashSet<int>> taskList;
 
+        private bool busy;
         bool[] status;
         Graph g;
 
@@ -30,11 +32,13 @@ namespace SCC_Detection.SCCDetectors
             this.result = new ResultSet();
 
             this.taskList = new ConcurrentQueue<HashSet<int>>();
+            this.busy = true;
         }
 
         public override ResultSet Compute(Graph g)
         {
             this.g = g;
+            this.busy = true;
 
             //g.AddShortcuts(7);
 
@@ -53,10 +57,24 @@ namespace SCC_Detection.SCCDetectors
                 threads[copy] = new Thread(new ThreadStart(() => DCSCTask(copy)));
                 threads[copy].Start();
             }
-            
+
+            /*
             for (int i = 0; i < threadcount; i++)
             {
                 threads[i].Join();
+            }
+            */
+
+            lock(finishedLock)
+            {
+                Monitor.Wait(finishedLock);
+            }
+            
+            this.busy = false;
+
+            lock (pulseLock)
+            {
+                Monitor.PulseAll(pulseLock);
             }
 
             return this.result;
@@ -66,24 +84,23 @@ namespace SCC_Detection.SCCDetectors
         {
             HashSet<int> subgraph;
             
-            while(true)
+            while(this.busy)
             {
-                this.status[id] = false;
-
                 while (taskList.TryDequeue(out subgraph))
                 {
-                    //Console.WriteLine("{0} processing subgraph", id);
+                    this.status[id] = false;
                     ProcessSubgraph(subgraph);
                 }
 
                 this.status[id] = true;
-
+                
                 if (this.Done())
                 {
-                    lock (pulseLock)
+                    lock(finishedLock)
                     {
-                        Monitor.PulseAll(pulseLock);
+                        Monitor.Pulse(finishedLock);
                     }
+
                     return;
                 }
 

@@ -5,6 +5,7 @@ using System.Text;
 using System.Linq;
 
 using SCC_Detection.Datastructures;
+using System.Collections.Concurrent;
 
 namespace SCC_Detection.Input
 {
@@ -12,7 +13,7 @@ namespace SCC_Detection.Input
     {
         public static Graph ReadFile(string filename, int threads)
         {
-            Dictionary<int, List<int>> map = new Dictionary<int, List<int>>();
+            ConcurrentDictionary<int, List<int>> map = new ConcurrentDictionary<int, List<int>>();
 
             using (StreamReader reader = new StreamReader(filename))
             {
@@ -36,7 +37,7 @@ namespace SCC_Detection.Input
 
         public static Graph ReadFileSNAP(string filename, int threads)
         {
-            Dictionary<int, List<int>> map = new Dictionary<int, List<int>>();
+            ConcurrentDictionary<int, List<int>> map = new ConcurrentDictionary<int, List<int>>();
 
             using (StreamReader reader = new StreamReader(filename))
             {

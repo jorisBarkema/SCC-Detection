@@ -13,7 +13,7 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void emptyTest()
         {
-            Graph g = RandomGraph.Generate(0, 0);
+            Graph g = RandomGraph.Generate(0, 0, 1);
 
             Assert.AreEqual(0, g.GetMap().Count);
         }
@@ -21,7 +21,7 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void normalTest()
         {
-            Graph g = RandomGraph.Generate(20, 0.5);
+            Graph g = RandomGraph.Generate(20, 0.5, 1);
 
             Assert.AreEqual(20, g.GetMap().Count);
 
@@ -34,7 +34,7 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void noConnectionsTest()
         {
-            Graph g = RandomGraph.Generate(20, 0);
+            Graph g = RandomGraph.Generate(20, 0, 1);
 
             Assert.AreEqual(20, g.GetMap().Count);
 
@@ -47,7 +47,7 @@ namespace SCC_Detection_Test
         [TestMethod]
         public void tooManyConnectionsTest()
         {
-            Graph g = RandomGraph.Generate(20, 1.1);
+            Graph g = RandomGraph.Generate(20, 1.1, 1);
 
             Assert.AreEqual(20, g.GetMap().Count);
 

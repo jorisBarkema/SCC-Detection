@@ -15,11 +15,13 @@ namespace SCC_Detection.SCCDetectors
     public class MultiPivot : SCCDetector
     {
         readonly object pulseLock = new object();
+        readonly object finishedLock = new object();
 
         ResultSet result;
         int threadcount;
         ConcurrentQueue<HashSet<int>> taskList;
 
+        private bool busy;
         bool[] status;
         Graph g;
 
@@ -29,6 +31,7 @@ namespace SCC_Detection.SCCDetectors
 
             this.threadcount = threadcount;
             this.status = new bool[threadcount];
+            this.busy = true;
 
             this.result = new ResultSet();
 
@@ -38,6 +41,7 @@ namespace SCC_Detection.SCCDetectors
         public override ResultSet Compute(Graph g)
         {
             this.g = g;
+            this.busy = true;
 
             taskList.Enqueue(g.Vertices());
 
@@ -55,9 +59,23 @@ namespace SCC_Detection.SCCDetectors
                 threads[copy].Start();
             }
 
+            /*
             for (int i = 0; i < threadcount; i++)
             {
                 threads[i].Join();
+            }
+            */
+
+            lock (finishedLock)
+            {
+                Monitor.Wait(finishedLock);
+            }
+
+            this.busy = false;
+
+            lock (pulseLock)
+            {
+                Monitor.PulseAll(pulseLock);
             }
 
             return this.result;
@@ -67,12 +85,11 @@ namespace SCC_Detection.SCCDetectors
         {
             HashSet<int> subgraph;
 
-            while (true)
+            while (this.busy)
             {
-                this.status[id] = false;
-
                 while (taskList.TryDequeue(out subgraph))
                 {
+                    this.status[id] = false;
                     ProcessSubgraph(subgraph);
                 }
 
@@ -80,9 +97,9 @@ namespace SCC_Detection.SCCDetectors
 
                 if (this.Done())
                 {
-                    lock (pulseLock)
+                    lock (finishedLock)
                     {
-                        Monitor.PulseAll(pulseLock);
+                        Monitor.Pulse(finishedLock);
                     }
                     return;
                 }
