@@ -2,7 +2,7 @@
   "profiles": {
     "SCC-Detection": {
       "commandName": "Project",
-      "commandLineArgs": "20 4 ALL file D:\\Documents\\computing_science\\scriptie\\graphs\\email-Eu-core.txt SNAP"
+      "commandLineArgs": "20 8 ALL file D:\\Documents\\computing_science\\scriptie\\graphs\\email-Eu-core.txt SNAP"
     }
   }
 }

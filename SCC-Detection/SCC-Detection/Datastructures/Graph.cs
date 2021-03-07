@@ -14,8 +14,9 @@ namespace SCC_Detection.Datastructures
         private ConcurrentDictionary<int, List<int>> map;
         private ConcurrentDictionary<int, List<int>> transposedMap;
         private ParallelOptions parallelOptions;
+        private int threads;
         private bool shortcutsAdded = false;
-
+        
         Random rng;
 
         private readonly object graphLock = new object();
@@ -30,6 +31,7 @@ namespace SCC_Detection.Datastructures
             this.transposedMap = Graph.Transpose(this.map);
 
             this.parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = threads };
+            this.threads = threads;
         }
 
         public Graph(Graph g, bool transposed = false, int threads = 1)
@@ -37,6 +39,7 @@ namespace SCC_Detection.Datastructures
             this.rng = new Random();
 
             this.parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = threads };
+            this.threads = threads;
 
             if (transposed)
             {
@@ -84,10 +87,12 @@ namespace SCC_Detection.Datastructures
             if (shouldAddShortcuts)
             {
                 // Add the shortcuts
-                int h = 3; // Maximum recursion
+                int h = 1; // Maximum recursion
                 ConcurrentDictionary<int, HashSet<int>> shortcuts = ParSC(totalSet, h);
 
-                
+                //Console.WriteLine($"Adding {shortcuts.Count} shortcuts");
+
+
                 foreach(KeyValuePair<int, HashSet<int>> shortcut in shortcuts)
                 {
                     foreach (int to in shortcut.Value)
@@ -136,8 +141,12 @@ namespace SCC_Detection.Datastructures
 
             List<List<int>> pivotGroups = GetPivotGroups(pivots);
 
-            //foreach(List<int> currentPivots in pivotGroups)
-            Parallel.ForEach(pivotGroups, parallelOptions, (currentPivots) =>
+            //Stopwatch s = new Stopwatch();
+            //s.Start();
+
+            // Making this loop parallel causes an enormous slowdown,
+            // while increasing CPU usage to almost 100% mostly
+            foreach(List<int> currentPivots in pivotGroups)
             {
                 // Random value for d in [1, ..., Nl)
                 int d = rng.Next(Nl - 1) + 1;
@@ -207,6 +216,9 @@ namespace SCC_Detection.Datastructures
                     }
                 });
 
+                //Console.WriteLine($"{s.ElapsedMilliseconds} ms on bfs loop");
+                //s.Restart();
+
                 Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
                 {
                     if (!alive[pivot]) return;
@@ -220,43 +232,16 @@ namespace SCC_Detection.Datastructures
                     backwardCoresDictionary.TryGetValue(pivot, out backwardCore);
                     forwardFringesDictionary.TryGetValue(pivot, out forwardFringe);
                     backwardFringesDictionary.TryGetValue(pivot, out backwardFringe);
-
+                    
                     // Remove the vertices which have also been visited by another search
                     // Don't think this will make the algorithm faster, but the paper says to do it
                     // Remove this when testing without tags
 
                     /*
-                    int[] forwardCoreCopy = new int[forwardCore.Count];
-                    forwardCore.CopyTo(forwardCoreCopy);
-
-                    foreach (int v in forwardCoreCopy)
-                    {
-                        if (HasLowerTag(tagDictionary, v, pivot)) forwardCore.Remove(v);
-                    }
-
-                    int[] backwardCoreCopy = new int[backwardCore.Count];
-                    backwardCore.CopyTo(backwardCoreCopy);
-
-                    foreach (int v in backwardCoreCopy)
-                    {
-                        if (HasLowerTag(tagDictionary, v, pivot)) backwardCore.Remove(v);
-                    }
-
-                    int[] forwardFringeCopy = new int[forwardFringe.Count];
-                    forwardFringe.CopyTo(forwardFringeCopy);
-
-                    foreach (int v in forwardFringeCopy)
-                    {
-                        if (HasLowerTag(tagDictionary, v, pivot)) forwardFringe.Remove(v);
-                    }
-
-                    int[] backwardFringeCopy = new int[backwardFringe.Count];
-                    backwardFringe.CopyTo(backwardFringeCopy);
-
-                    foreach (int v in backwardFringeCopy)
-                    {
-                        if (HasLowerTag(tagDictionary, v, pivot)) backwardFringe.Remove(v);
-                    }
+                    forwardCore.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
+                    backwardCore.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
+                    forwardFringe.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
+                    backwardFringe.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
                     */
 
                     HashSet<int> VB = new HashSet<int>(forwardCore.Intersect(backwardCoresDictionary[pivot]));
@@ -278,6 +263,10 @@ namespace SCC_Detection.Datastructures
                     }
                 });
 
+                //Console.WriteLine($"{s.ElapsedMilliseconds} ms on shortcuts loop");
+                //s.Restart();
+
+
                 foreach (int pivot in currentPivots)
                 {
                     if (!alive[pivot]) continue;
@@ -293,7 +282,10 @@ namespace SCC_Detection.Datastructures
                         alive[id] = false;
                     }
                 }
-            });
+
+                //Console.WriteLine($"{s.ElapsedMilliseconds} ms on alive loop");
+
+            }
 
             return S;
         }
@@ -302,8 +294,9 @@ namespace SCC_Detection.Datastructures
         {
             List<List<int>> groups = new List<List<int>>();
 
+            // Start with size > 1 to increase concurrency
             int current = 0;
-            int size = 1;
+            int size = this.threads;
 
             while (current < pivots.Count - 1)
             {
@@ -553,21 +546,8 @@ namespace SCC_Detection.Datastructures
                 if (!HasLowerTag(tagDictionary, currentID, pivot))
                 {
                     reachable.Add(currentID);
-                    /*
-                    try
-                    {
-                        rwl.AcquireWriterLock(100);
-                        tagDictionary.AddOrUpdate(currentID, new List<int> { pivot }, (key, value) => {
-                            value.Add(pivot);
-                            return value;
-                        });
-                    }
-                    finally
-                    {
-                        rwl.ReleaseWriterLock();
-                    }
-                    */
 
+                    
                     lock(graphLock)
                     {
                         tagDictionary.AddOrUpdate(currentID, new List<int> { pivot }, (key, value) => {
@@ -575,13 +555,15 @@ namespace SCC_Detection.Datastructures
                             return value;
                         });
                     }
-
+                    
+                    
                     /*
                     tagDictionary.AddOrUpdate(currentID, new List<int> { pivot }, (key, value) => {
                         value.Add(pivot);
                         return value;
                     });
                     */
+
                     // TryGetValue is lock-free:
                     // https://arbel.net/2013/02/03/best-practices-for-using-concurrentdictionary/
                     List<int> neighbours;
@@ -604,35 +586,22 @@ namespace SCC_Detection.Datastructures
         private bool HasLowerTag(ConcurrentDictionary<int, List<int>> dict, int id, int tag)
         {
             List<int> values = new List<int>();
-            //int min = Int32.MaxValue;
 
+            
             if (dict.TryGetValue(id, out values))
             {
-                //int[] valuesArray = new int[values.Count];
-                //values.CopyTo(valuesArray);
-
-
                 //return values.Min() < tag;
-
+                
+                
+                // Lock is needed because calues can be editied during the calculation.
+                // Copying to new list also throws an error if values is edited during the copying.
                 lock(graphLock)
                 {
                     return values.Min() < tag;
                 }
-
-                /*
-                try
-                {
-                    rwl.AcquireReaderLock(100);
-                    min = values.Min();
-                }
-                finally
-                {
-                    rwl.ReleaseReaderLock();
-                }
-
-                return min < tag;
-                */
+                
             }
+            
 
             return false;
         }
