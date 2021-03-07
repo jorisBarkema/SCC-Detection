@@ -30,6 +30,9 @@ namespace SCC_Detection.Datastructures
             this.map = this.InitializeMap(map);
             this.transposedMap = Graph.Transpose(this.map);
 
+            // Maximum number of threads
+            //https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.paralleloptions.maxdegreeofparallelism?redirectedfrom=MSDN&view=net-5.0#System_Threading_Tasks_ParallelOptions_MaxDegreeOfParallelism
+
             this.parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = threads };
             this.threads = threads;
         }
@@ -62,8 +65,8 @@ namespace SCC_Detection.Datastructures
         /// <returns>HashSet of the reachable vertices</returns>
         public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
         {
-            //return ParallelBFS(fromSet, totalSet, map);
-            return ParallelDigraphReachability(fromSet, totalSet, map);
+            return ParallelBFS(fromSet, totalSet, map);
+            //return ParallelDigraphReachability(fromSet, totalSet, map);
         }
 
         private HashSet<int> ParallelDigraphReachability(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
@@ -330,8 +333,6 @@ namespace SCC_Detection.Datastructures
 
             ConcurrentDictionary<int, bool> reachable = new ConcurrentDictionary<int, bool>();
             
-            // Maximum number of threads
-            //https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.paralleloptions.maxdegreeofparallelism?redirectedfrom=MSDN&view=net-5.0#System_Threading_Tasks_ParallelOptions_MaxDegreeOfParallelism
             
             while (edge.Except(reachable).Count() > 0)
             {

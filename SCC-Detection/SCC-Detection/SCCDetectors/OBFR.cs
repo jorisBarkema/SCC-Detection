@@ -28,6 +28,7 @@ namespace SCC_Detection.SCCDetectors
         Graph g;
 
         readonly object pulseLock = new object();
+        readonly object finishedLock = new object();
 
         bool[] status;
         ConcurrentQueue<Slice> taskList;
@@ -71,10 +72,22 @@ namespace SCC_Detection.SCCDetectors
                 threads[copy] = new Thread(new ThreadStart(() => OBFRTask(copy)));
                 threads[copy].Start();
             }
-            
+
+            /*
             for (int i = 0; i < threadcount; i++)
             {
                 threads[i].Join();
+            }
+            */
+
+            lock (finishedLock)
+            {
+                Monitor.Wait(finishedLock);
+            }
+
+            lock (pulseLock)
+            {
+                Monitor.PulseAll(pulseLock);
             }
 
             return this.Result;
@@ -87,10 +100,9 @@ namespace SCC_Detection.SCCDetectors
 
             while (true)
             {
-                this.status[id] = false;
-
                 while (taskList.TryDequeue(out slice))
                 {
+                    this.status[id] = false;
                     ProcessSLice(slice);
                 }
 
@@ -100,7 +112,10 @@ namespace SCC_Detection.SCCDetectors
                 {
                     lock (pulseLock)
                     {
-                        Monitor.PulseAll(pulseLock);
+                        lock (finishedLock)
+                        {
+                            Monitor.Pulse(finishedLock);
+                        }
                     }
 
                     return;

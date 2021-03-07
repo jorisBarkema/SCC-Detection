@@ -15,6 +15,7 @@ namespace SCC_Detection.SCCDetectors
     public class MultiPivot : SCCDetector
     {
         readonly object pulseLock = new object();
+        readonly object finishedLock = new object();
 
         ResultSet result;
         int threadcount;
@@ -55,9 +56,21 @@ namespace SCC_Detection.SCCDetectors
                 threads[copy].Start();
             }
 
+            /*
             for (int i = 0; i < threadcount; i++)
             {
                 threads[i].Join();
+            }
+            */
+
+            lock (finishedLock)
+            {
+                Monitor.Wait(finishedLock);
+            }
+
+            lock (pulseLock)
+            {
+                Monitor.PulseAll(pulseLock);
             }
 
             return this.result;
@@ -69,10 +82,9 @@ namespace SCC_Detection.SCCDetectors
 
             while (true)
             {
-                this.status[id] = false;
-
                 while (taskList.TryDequeue(out subgraph))
                 {
+                    this.status[id] = false;
                     ProcessSubgraph(subgraph);
                 }
 
@@ -82,7 +94,10 @@ namespace SCC_Detection.SCCDetectors
                 {
                     lock (pulseLock)
                     {
-                        Monitor.PulseAll(pulseLock);
+                        lock (finishedLock)
+                        {
+                            Monitor.Pulse(finishedLock);
+                        }
                     }
                     return;
                 }
