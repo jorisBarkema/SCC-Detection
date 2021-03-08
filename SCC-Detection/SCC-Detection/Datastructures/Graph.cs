@@ -65,6 +65,8 @@ namespace SCC_Detection.Datastructures
         /// <returns>HashSet of the reachable vertices</returns>
         public HashSet<int> Reachable(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
         {
+            // The three reachability methods to test
+            //return BFS(fromSet, totalSet, map);
             return ParallelBFS(fromSet, totalSet, map);
             //return ParallelDigraphReachability(fromSet, totalSet, map);
         }
@@ -130,7 +132,7 @@ namespace SCC_Detection.Datastructures
 
             //TODO: bedenken wat deze waarden moeten zijn, misschien als eigenschappen van Graph class opslaan
             int Nk = 1;
-            int Nl = 4;
+            int Nl = 7;
             int D = 1;
 
             // Initialise the values
@@ -148,7 +150,7 @@ namespace SCC_Detection.Datastructures
             //s.Start();
 
             // Making this loop parallel causes an enormous slowdown,
-            // while increasing CPU usage to almost 100% mostly
+            // while increasing CPU usage to about 100%
             foreach(List<int> currentPivots in pivotGroups)
             {
                 // Random value for d in [1, ..., Nl)
@@ -165,7 +167,7 @@ namespace SCC_Detection.Datastructures
                 ConcurrentDictionary<int, HashSet<int>> backwardFringesDictionary = new ConcurrentDictionary<int, HashSet<int>>();
                 ConcurrentDictionary<int, HashSet<int>> forwardFringesDictionary = new ConcurrentDictionary<int, HashSet<int>>();
 
-                ConcurrentDictionary<int, List<int>> tagDictionary = new ConcurrentDictionary<int, List<int>>();
+                ConcurrentDictionary<int, int> tagDictionary = new ConcurrentDictionary<int, int>();
 
                 Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
                 {
@@ -173,11 +175,11 @@ namespace SCC_Detection.Datastructures
 
                     // Do this with or without tags depending on what I'm testing
 
-                    backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, transposedMap, alive));
-                    forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, alive));
+                    //backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, transposedMap, alive));
+                    //forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, alive));
 
-                    //backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, transposedMap, alive, tagDictionary));
-                    //forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, alive, tagDictionary));
+                    backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, transposedMap, alive, tagDictionary));
+                    forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, alive, tagDictionary));
 
                     HashSet<int> forwardCore;
                     HashSet<int> backwardCore;
@@ -185,11 +187,11 @@ namespace SCC_Detection.Datastructures
                     forwardCoresDictionary.TryGetValue(pivot, out forwardCore);
                     backwardCoresDictionary.TryGetValue(pivot, out backwardCore);
 
-                    backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap, alive).Except(backwardCore)));
-                    forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, alive).Except(forwardCore)));
+                    //backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap, alive).Except(backwardCore)));
+                    //forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, alive).Except(forwardCore)));
 
-                    //backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, transposedMap, alive, tagDictionary).Except(backwardCore)));
-                    //forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, alive, tagDictionary).Except(forwardCore)));
+                    backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, transposedMap, alive, tagDictionary).Except(backwardCore)));
+                    forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, alive, tagDictionary).Except(forwardCore)));
 
                     HashSet<int> forwardFringe;
                     HashSet<int> backwardFringe;
@@ -240,12 +242,12 @@ namespace SCC_Detection.Datastructures
                     // Don't think this will make the algorithm faster, but the paper says to do it
                     // Remove this when testing without tags
 
-                    /*
+                    
                     forwardCore.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
                     backwardCore.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
                     forwardFringe.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
                     backwardFringe.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
-                    */
+                   
 
                     HashSet<int> VB = new HashSet<int>(forwardCore.Intersect(backwardCoresDictionary[pivot]));
                     HashSet<int> VS = new HashSet<int>(VB.Except(forwardCore));
@@ -515,7 +517,7 @@ namespace SCC_Detection.Datastructures
             return result;
         }
         
-        public HashSet<int> DepthLimitedBFSWithTags(int pivot, int depth, Dictionary<int, bool> alive, ConcurrentDictionary<int, List<int>> tagDictionary)
+        public HashSet<int> DepthLimitedBFSWithTags(int pivot, int depth, Dictionary<int, bool> alive, ConcurrentDictionary<int, int> tagDictionary)
         {
             return DepthLimitedBFSWithTags(pivot, depth, this.map, alive, tagDictionary);
         }
@@ -526,7 +528,7 @@ namespace SCC_Detection.Datastructures
         /// <param name="pivot"></param>
         /// <param name="depth"></param>
         /// <returns></returns>
-        public HashSet<int> DepthLimitedBFSWithTags(int pivot, int depth, ConcurrentDictionary<int, List<int>> map, Dictionary<int, bool> alive, ConcurrentDictionary<int, List<int>> tagDictionary)
+        public HashSet<int> DepthLimitedBFSWithTags(int pivot, int depth, ConcurrentDictionary<int, List<int>> map, Dictionary<int, bool> alive, ConcurrentDictionary<int, int> tagDictionary)
         {
             // Item1 is the id, Item2 is the distance
             Queue<Tuple<int, int>> edge = new Queue<Tuple<int, int>>();
@@ -549,13 +551,10 @@ namespace SCC_Detection.Datastructures
                     reachable.Add(currentID);
 
                     
-                    lock(graphLock)
-                    {
-                        tagDictionary.AddOrUpdate(currentID, new List<int> { pivot }, (key, value) => {
-                            value.Add(pivot);
-                            return value;
-                        });
-                    }
+                    // If the pivot is lower than the current lowest for ths current id, replace it.
+                    tagDictionary.AddOrUpdate(currentID, pivot, (key, value) => {
+                        return value > pivot ? pivot : value;
+                    });
                     
                     
                     /*
@@ -584,23 +583,25 @@ namespace SCC_Detection.Datastructures
             return reachable;
         }
 
-        private bool HasLowerTag(ConcurrentDictionary<int, List<int>> dict, int id, int tag)
+        private bool HasLowerTag(ConcurrentDictionary<int, int> dict, int id, int tag)
         {
-            List<int> values = new List<int>();
+            int value;
 
             
-            if (dict.TryGetValue(id, out values))
+            if (dict.TryGetValue(id, out value))
             {
                 //return values.Min() < tag;
-                
-                
+
+
                 // Lock is needed because calues can be editied during the calculation.
                 // Copying to new list also throws an error if values is edited during the copying.
-                lock(graphLock)
+                /*
+                lock (graphLock)
                 {
                     return values.Min() < tag;
                 }
-                
+                */
+                return value < tag;
             }
             
 

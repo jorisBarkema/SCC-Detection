@@ -134,15 +134,43 @@ namespace SCC_Detection.SCCDetectors
 
             forward.ExceptWith(SCC);
             backward.ExceptWith(SCC);
-            
-            //TODO: maybe if the count is < than some threshold, do it straight away here and do not add to queue.
-            // prevents some parallelism overhead, but want to experiment for the correct threshold when the rest is done.
 
-            if (subgraph.Count > 0) this.taskList.Enqueue(subgraph);
-            if (forward.Count > 0) this.taskList.Enqueue(forward);
-            if (backward.Count > 0) this.taskList.Enqueue(backward);
+            // Does not appear to speed it up, at least not significantly.
+            /*
+            int threshold = 20;
 
-            lock(pulseLock)
+            if (subgraph.Count < threshold)
+            {
+                ProcessSubgraph(subgraph);
+            } else
+            {
+                this.taskList.Enqueue(subgraph);
+            }
+
+            if (forward.Count < threshold)
+            {
+                ProcessSubgraph(forward);
+            }
+            else
+            {
+                this.taskList.Enqueue(forward);
+            }
+
+            if (backward.Count < threshold)
+            {
+                ProcessSubgraph(backward);
+            }
+            else
+            {
+                this.taskList.Enqueue(backward);
+            }
+            */
+
+            this.taskList.Enqueue(subgraph);
+            this.taskList.Enqueue(forward);
+            this.taskList.Enqueue(backward);
+
+            lock (pulseLock)
             {
                 Monitor.PulseAll(pulseLock);
             }
