@@ -130,10 +130,9 @@ namespace SCC_Detection.Datastructures
 
             ConcurrentDictionary<int, HashSet<int>> S = new ConcurrentDictionary<int, HashSet<int>>();
 
-            //TODO: bedenken wat deze waarden moeten zijn, misschien als eigenschappen van Graph class opslaan
             int Nk = 1;
             int Nl = 7;
-            int D = 1;
+            int D = 3;
 
             // Initialise the values
             List<int> pivots = Shuffled(totalSet.ToList());
@@ -145,10 +144,7 @@ namespace SCC_Detection.Datastructures
             }
 
             List<List<int>> pivotGroups = GetPivotGroups(pivots);
-
-            //Stopwatch s = new Stopwatch();
-            //s.Start();
-
+            
             // Making this loop parallel causes an enormous slowdown,
             // while increasing CPU usage to about 100%
             foreach(List<int> currentPivots in pivotGroups)
@@ -172,12 +168,7 @@ namespace SCC_Detection.Datastructures
                 Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
                 {
                     if (!alive[pivot]) return;
-
-                    // Do this with or without tags depending on what I'm testing
-
-                    //backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, transposedMap, alive));
-                    //forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFS(pivot, d * D, alive));
-
+                    
                     backwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, transposedMap, alive, tagDictionary));
                     forwardCoresDictionary.TryAdd(pivot, this.DepthLimitedBFSWithTags(pivot, d * D, alive, tagDictionary));
 
@@ -186,10 +177,7 @@ namespace SCC_Detection.Datastructures
 
                     forwardCoresDictionary.TryGetValue(pivot, out forwardCore);
                     backwardCoresDictionary.TryGetValue(pivot, out backwardCore);
-
-                    //backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, transposedMap, alive).Except(backwardCore)));
-                    //forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFS(pivot, (d + 1) * D, alive).Except(forwardCore)));
-
+                    
                     backwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, transposedMap, alive, tagDictionary).Except(backwardCore)));
                     forwardFringesDictionary.TryAdd(pivot, new HashSet<int>(this.DepthLimitedBFSWithTags(pivot, (d + 1) * D, alive, tagDictionary).Except(forwardCore)));
 
@@ -220,10 +208,7 @@ namespace SCC_Detection.Datastructures
                         });
                     }
                 });
-
-                //Console.WriteLine($"{s.ElapsedMilliseconds} ms on bfs loop");
-                //s.Restart();
-
+                
                 Parallel.ForEach(currentPivots, parallelOptions, (pivot) =>
                 {
                     if (!alive[pivot]) return;
@@ -239,10 +224,6 @@ namespace SCC_Detection.Datastructures
                     backwardFringesDictionary.TryGetValue(pivot, out backwardFringe);
                     
                     // Remove the vertices which have also been visited by another search
-                    // Don't think this will make the algorithm faster, but the paper says to do it
-                    // Remove this when testing without tags
-
-                    
                     forwardCore.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
                     backwardCore.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
                     forwardFringe.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
@@ -253,7 +234,6 @@ namespace SCC_Detection.Datastructures
                     HashSet<int> VS = new HashSet<int>(VB.Except(forwardCore));
                     HashSet<int> VP = new HashSet<int>(VB.Except(backwardCoresDictionary[pivot]));
 
-                    // This also in parallel? I think I have too much or at least enough parallelism already
                     ConcurrentDictionary<int, HashSet<int>> forwardS = ParSC(new HashSet<int>(VS.Union(forwardFringe)), h - 1);
                     ConcurrentDictionary<int, HashSet<int>> backwardS = ParSC(new HashSet<int>(VP.Union(backwardFringe)), h - 1);
 
@@ -267,11 +247,7 @@ namespace SCC_Detection.Datastructures
                         S[pair.Key].UnionWith(pair.Value);
                     }
                 });
-
-                //Console.WriteLine($"{s.ElapsedMilliseconds} ms on shortcuts loop");
-                //s.Restart();
-
-
+                
                 foreach (int pivot in currentPivots)
                 {
                     if (!alive[pivot]) continue;
@@ -287,9 +263,6 @@ namespace SCC_Detection.Datastructures
                         alive[id] = false;
                     }
                 }
-
-                //Console.WriteLine($"{s.ElapsedMilliseconds} ms on alive loop");
-
             }
 
             return S;
@@ -350,8 +323,6 @@ namespace SCC_Detection.Datastructures
                     if (map.TryGetValue(current.Key, out allNeighbours))
                     {
                         // If allNeighbours changes during the operations then the program crashes so create a copy
-                        // CopyTo requires all locks though, this may be quite a performance hit
-                        // TODO: look if this can be better
                         int[] allNeighboursCopy = new int[allNeighbours.Count];
                         allNeighbours.CopyTo(allNeighboursCopy);
 
@@ -1010,10 +981,12 @@ namespace SCC_Detection.Datastructures
                 fromList.Remove(to);
             }
 
-            // This will very rarely throw an ArgumentOutOfRangeException
-            if (transposedMap.TryGetValue(to, out toList))
+            lock(graphLock)
             {
-                toList.Remove(from);
+                if (transposedMap.TryGetValue(to, out toList))
+                {
+                    toList.Remove(from);
+                }
             }
         }
         

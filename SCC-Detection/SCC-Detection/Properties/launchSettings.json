@@ -2,7 +2,7 @@
   "profiles": {
     "SCC-Detection": {
       "commandName": "Project",
-      "commandLineArgs": "20 4 DCSC file D:\\Documents\\computing_science\\scriptie\\graphs\\Wiki-Vote.txt SNAP"
+      "commandLineArgs": "100 4 OBFR file D:\\Documents\\computing_science\\scriptie\\graphs\\Wiki-Vote.txt SNAP"
     }
   }
 }
