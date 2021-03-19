@@ -32,6 +32,9 @@ namespace SCC_Detection.Datastructures
 
             // Maximum number of threads
             //https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.paralleloptions.maxdegreeofparallelism?redirectedfrom=MSDN&view=net-5.0#System_Threading_Tasks_ParallelOptions_MaxDegreeOfParallelism
+            // Sadly it apppears that this does not work globally, so only useful when threads is 1
+            // because e.g. with 2 there will be two tasks calculating reachability, each using max. 2 concurrent tasks
+            // https://stackoverflow.com/questions/57633074/is-paralleloptions-maxdegreeofparallelism-applied-globally-over-multiple-concurr
 
             this.parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = threads };
             this.threads = threads;
@@ -67,8 +70,8 @@ namespace SCC_Detection.Datastructures
         {
             // The three reachability methods to test
             //return BFS(fromSet, totalSet, map);
-            return ParallelBFS(fromSet, totalSet, map);
-            //return ParallelDigraphReachability(fromSet, totalSet, map);
+            //return ParallelBFS(fromSet, totalSet, map);
+            return ParallelDigraphReachability(fromSet, totalSet, map);
         }
 
         private HashSet<int> ParallelDigraphReachability(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
@@ -228,8 +231,8 @@ namespace SCC_Detection.Datastructures
                     backwardCore.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
                     forwardFringe.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
                     backwardFringe.RemoveWhere((x) => HasLowerTag(tagDictionary, x, pivot));
-                   
 
+                    // TODO: Forgot to change backwardCoresDictionary[pivot] to backwardCore
                     HashSet<int> VB = new HashSet<int>(forwardCore.Intersect(backwardCoresDictionary[pivot]));
                     HashSet<int> VS = new HashSet<int>(VB.Except(forwardCore));
                     HashSet<int> VP = new HashSet<int>(VB.Except(backwardCoresDictionary[pivot]));
@@ -297,6 +300,7 @@ namespace SCC_Detection.Datastructures
             return groups;
         }
 
+        /*
         private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
         {
             ConcurrentDictionary<int, bool> edge = new ConcurrentDictionary<int, bool>();
@@ -340,6 +344,270 @@ namespace SCC_Detection.Datastructures
 
             return new HashSet<int>(reachable.Keys);
         }
+        */
+
+        private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
+        {
+            ConcurrentDictionary<int, bool> edge = new ConcurrentDictionary<int, bool>();
+
+            foreach (int id in fromSet)
+            {
+                edge[id] = true;
+            }
+
+            ConcurrentDictionary<int, bool> reachable = new ConcurrentDictionary<int, bool>();
+
+            bool activeEdge = true;
+
+            //while (edge.Except(reachable).Count() > 0)
+            while (activeEdge)
+            {
+                activeEdge = false;
+
+                Parallel.ForEach(edge, parallelOptions, (current) =>
+                {
+
+                    //if (!reachable.Keys.Contains(current.Key))
+                    if (!reachable.TryGetValue(current.Key, out _))
+                    {
+                        //reachable[current.Key] = true;
+                        reachable.TryAdd(current.Key, true);
+                        edge.TryRemove(current.Key, out _);
+
+                        List<int> allNeighbours;
+
+                        if (map.TryGetValue(current.Key, out allNeighbours))
+                        {
+                            // If allNeighbours changes during the operations then the program crashes so create a copy
+                            int[] allNeighboursCopy = new int[allNeighbours.Count];
+                            allNeighbours.CopyTo(allNeighboursCopy);
+
+                            // This is not needed for neighboursInSet because only OBFR changes the graph during computation
+                            // and an OBFR thread only makes changes within its own set.
+                            List<int> neighboursInSet = totalSet.Intersect(allNeighboursCopy).ToList();
+
+                            foreach (int neighbour in neighboursInSet)
+                            {
+                                //edge[neighbour] = true;
+                                edge.TryAdd(neighbour, true);
+                                activeEdge = true;
+                            }
+                        }
+                    }
+
+                    
+                });
+            }
+
+            return new HashSet<int>(reachable.Keys);
+        }
+
+
+        /*
+        private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
+        {
+            object pulseLock = new object();
+            object finishedLock = new object();
+
+            bool busy = true;
+            bool[] status = new bool[this.threads];
+
+            ConcurrentQueue<int> edge = new ConcurrentQueue<int>(fromSet);
+            HashSet<int> reachable = new HashSet<int>();
+
+            Thread[] threads = new Thread[this.threads];
+
+            for (int i = 0; i < this.threads; i++)
+            {
+                // Make a copy to capture the variable
+                // https://stackoverflow.com/questions/271440/captured-variable-in-a-loop-in-c-sharp
+                int copy = i;
+
+                threads[copy] = new Thread(new ThreadStart(() =>
+                {
+                    int current;
+
+                    while (busy)
+                    {
+                        while (edge.TryDequeue(out current))
+                        {
+                            status[copy] = false;
+
+                            if (totalSet.Contains(current) && !reachable.Contains(current))
+                            {
+                                reachable.Add(current);
+                            }
+
+                            List<int> neighbours;
+
+                            if (map.TryGetValue(current, out neighbours))
+                            {
+                                // If allNeighbours changes during the operations then the program crashes so create a copy
+                                int[] neighboursCopy = new int[neighbours.Count];
+                                neighbours.CopyTo(neighboursCopy);
+
+                                // Only look at neighbours in set
+                                List<int> neighboursInSet = totalSet.Intersect(neighboursCopy).ToList();
+
+                                foreach (int neighbour in neighboursInSet)
+                                {
+                                    if (!reachable.Contains(neighbour) && !edge.Contains(neighbour))
+                                    {
+                                        edge.Enqueue(neighbour);
+                                    }
+                                }
+                            }
+                        }
+
+                        status[copy] = true;
+
+                        if (!status.Contains(false))
+                        {
+                            lock (finishedLock)
+                            {
+                                Monitor.Pulse(finishedLock);
+                            }
+
+                            return;
+                        }
+
+                        lock (pulseLock)
+                        {
+                            Monitor.Wait(pulseLock);
+                        }
+                    }
+                }));
+
+                threads[copy].Start();
+            }
+            
+            lock (finishedLock)
+            {
+                Monitor.Wait(finishedLock);
+            }
+
+            busy = false;
+
+            lock (pulseLock)
+            {
+                Monitor.PulseAll(pulseLock);
+            }
+
+            return reachable;
+        }
+        */
+
+        /*
+        private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
+        {
+            ConcurrentQueue<int> edge = new ConcurrentQueue<int>(fromSet);
+            ConcurrentDictionary<int, bool> reachable = new ConcurrentDictionary<int, bool>();
+
+            // Use the convention that a vertex can reach itself always,
+            // Because that makes sense when defining a single vertex as a trivial SCC.
+
+            Thread[] threads = new Thread[this.threads];
+
+            for (int i = 0; i < this.threads; i++)
+            {
+                // Make a copy to capture the variable
+                // https://stackoverflow.com/questions/271440/captured-variable-in-a-loop-in-c-sharp
+                int copy = i;
+
+                threads[copy] = new Thread(() =>
+                {
+                    int current;
+
+                    while (edge.TryDequeue(out current))
+                    {
+                        if (totalSet.Contains(current) && !reachable.ContainsKey(current))
+                        {
+                            //reachable.Add(current);
+
+                            reachable[current] = true;
+                            List<int> neighbours;
+
+                            if (map.TryGetValue(current, out neighbours))
+                            {
+                                // If allNeighbours changes during the operations then the program crashes so create a copy
+                                int[] neighboursCopy = new int[neighbours.Count];
+                                neighbours.CopyTo(neighboursCopy);
+
+                                // Only look at neighbours in set
+                                List<int> neighboursInSet = totalSet.Intersect(neighboursCopy).ToList();
+
+                                foreach (int neighbour in neighboursInSet)
+                                {
+                                    edge.Enqueue(neighbour);
+                                }
+                            }
+                        }
+                    }
+                });
+
+                threads[copy].Start();
+            }
+
+            for (int i = 0; i < this.threads; i++)
+            {
+                threads[i].Join();
+            }
+            
+            return new HashSet<int>(reachable.Keys);
+        }
+        */
+
+        /*
+        private HashSet<int> ParallelBFS(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
+        {
+            ConcurrentBag<int> edge = new ConcurrentBag<int>(fromSet);
+
+            //foreach(int id in fromSet)
+            //{
+            //    edge[id] = true;
+            //}
+
+            HashSet<int> reachable = new HashSet<int>();
+            
+            
+            while (edge.Count > 0)
+            {
+                List<int> v = edge.Take(edge.Count).ToList();
+                edge = new ConcurrentBag<int>();
+
+                Parallel.ForEach(v, parallelOptions, (current) =>
+                {
+                    if (!reachable.Contains(current))
+                    {
+                        reachable.Add(current);
+                    }
+                    
+                    List<int> allNeighbours;
+
+                    if (map.TryGetValue(current, out allNeighbours))
+                    {
+                        // If allNeighbours changes during the operations then the program crashes so create a copy
+                        int[] allNeighboursCopy = new int[allNeighbours.Count];
+                        allNeighbours.CopyTo(allNeighboursCopy);
+
+                        // This is not needed for neighboursInSet because only OBFR changes the graph during computation
+                        // and an OBFR thread only makes changes within its own set.
+                        List<int> neighboursInSet = totalSet.Intersect(allNeighboursCopy).ToList();
+
+                        foreach (int neighbour in neighboursInSet)
+                        {
+                            if (!reachable.Contains(neighbour))
+                            {
+                                edge.Add(neighbour);
+                            }
+                        }
+                    }
+                });
+            }
+
+            return new HashSet<int>(reachable);
+        }
+        */
 
         private HashSet<int> BFS(HashSet<int> fromSet, HashSet<int> totalSet, ConcurrentDictionary<int, List<int>> map)
         {
@@ -363,16 +631,16 @@ namespace SCC_Detection.Datastructures
 
                 if (map.TryGetValue(current, out neighbours))
                 {
+                    // If allNeighbours changes during the operations then the program crashes so create a copy
+                    int[] neighboursCopy = new int[neighbours.Count];
+                    neighbours.CopyTo(neighboursCopy);
+
                     // Only look at neighbours in set
-                    // Because OBFR changes the graph
-                    // which changes the neighbours, causing an error
-                    // but OBFR only changes the subgraph it is working on,
-                    // so if we only look at the neighbours in the subgraph then this is no problem.
-                    List<int> neighboursInSet = totalSet.Intersect(neighbours).ToList();
+                    List<int> neighboursInSet = totalSet.Intersect(neighboursCopy).ToList();
 
                     foreach (int neighbour in neighboursInSet)
                     {
-                        if (!reachable.Contains(neighbour))
+                        if (!reachable.Contains(neighbour) && !edge.Contains(neighbour))
                         {
                             edge.Enqueue(neighbour);
                         }
